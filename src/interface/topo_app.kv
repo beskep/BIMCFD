@@ -1,0 +1,68 @@
+#:kivy 1.11.1
+
+<Label>:
+    font_name: 'NotoSansKR'
+
+TopoLayout:
+    id: topo_layout
+
+    BoxLayout:
+        orientation: 'vertical'
+
+        BoxLayout:
+            size_hint_y: None
+            height: 30
+
+            Button:
+                text: 'Choose IFC file'
+                on_release: root.show_file_choose_dialog()
+            Button:
+                text: 'Select space'
+                on_release: app.show_space_list(self)
+            Button:
+                text: 'Visualize'
+                on_release: app.visualize()
+
+        BoxLayout:
+            id: vis_layout
+            # TopoRenderer:
+            #     id: renderer
+
+        BoxLayout:
+            size_hint_y: None
+            height: 30
+            Label:
+                id: message
+                text: ''
+                color: 0, 0, 0, 1
+                markup: True
+                height: 5
+                bcolor: 1, 1, 1, 1
+                canvas.before:
+                    Color:
+                        rgba: self.bcolor
+                    Rectangle:
+                        pos: self.pos
+                        size: self.size
+
+<FileChooseDialog>:
+    BoxLayout:
+        size: root.size
+        pos: root.pos
+        orientation: 'vertical'
+
+        FileChooserListView:
+            id: file_chooser
+
+        BoxLayout:
+            size_hint_y: None
+            height: 30
+            Button:
+                text: 'Cancel'
+                on_release: root.dismiss_popup()
+
+            Button:
+                text: 'Choose'
+                on_release:
+                    root.dismiss_popup()
+                    app.file_choose(file_chooser.selection)

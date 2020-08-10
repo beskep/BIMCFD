@@ -1,0 +1,78 @@
+/*--------------------------------*- C++ -*----------------------------------*\
+| =========                 |                                                 |
+| \\      /  F ield         | OpenFOAM: The Open Source CFD Toolbox           |
+|  \\    /   O peration     | Version:  v1812                                 |
+|   \\  /    A nd           | Web:      www.OpenFOAM.com                      |
+|    \\/     M anipulation  |                                                 |
+\*---------------------------------------------------------------------------*/
+FoamFile
+{
+    version     2.0;
+    format      ascii;
+    class       dictionary;
+    location    "system";
+    object      meshDict;
+}
+// * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
+
+// path to the surface mesh // relative from case or absolute
+surfaceFile "geometry.fms";
+
+// maximum cell size in the mesh (mandatory)
+maxCellSize 0.04999;
+
+// size of the cells at the bounday (optional)
+// boundaryCellSize 0.07499;
+
+// distance from the boundary at which // bolundary cell size shall be used (optional)
+// boundaryCellSizeRefinementThickness 10;
+
+// minimum cell size allowed in the automatic refinement procedure (optional)
+//minCellSize 0.1;
+enforceGeometryConstraints 1;
+
+// keep template cells intersecting boundary (optional)
+// keepCellsInterssectingBoundary 1; // 1 keep or 0 only internal cells are used
+
+// remove cells where distinct parts of the mesh are joined together (optional)
+// active only when keepCellsIntersectingBoundary is active
+// checkForGluedMes 1; // 1 active or 0 inactive
+
+// keep cells in the mesh template
+// which intersect selected patches/subsets (optional)
+// it is active when keepCellsIntersectingBoudnary // is switched off
+keepCellsIntersectingPatches
+{
+    // patch name
+    "Opening.*" // aceepts regex
+    {
+        keepCells 1; // 1 active or 0 inactive
+    }
+
+    // patch name
+    "Surface.*" // aceepts regex
+    {
+        keepCells 1; // 1 active or 0 inactive
+    }
+
+    // patch name
+    "Interior.*" // aceepts regex
+    {
+        keepCells 0; // 1 active or 0 inactive
+    }
+}
+
+boundaryLayers
+{
+    patchBoundaryLayers
+    {
+        "(Surface|Opening).*"
+        {
+            nLayers 5;
+            thicknessRatio 1.1;
+            // maxFirstLayerThickness 0.02;
+        }
+    }
+}
+
+// ************************************************************************* //
