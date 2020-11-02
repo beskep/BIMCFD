@@ -13,20 +13,18 @@ from OCC.Core.BRepBuilderAPI import BRepBuilderAPI_MakeVertex
 from OCC.Core.TopoDS import TopoDS_Compound, TopoDS_Shape
 from OCC.Extend.DataExchange import write_stl_file
 from OCC.Extend.TopologyUtils import TopologyExplorer
-
 from OCCUtils.Common import GpropsFromShape
 from OCCUtils.Construct import compound
-from converter.simplify import face_info, shapes_distance, get_boundingbox
+
+import utils
+from converter.simplify import face_info, get_boundingbox, shapes_distance
 
 DEFAULT_BLENDER_PATH = r'C:\Program Files\Blender Foundation\Blender\blender'
 
-_SRC_DIR = os.path.abspath(os.path.join(__file__, '../../'))
-EMPTY_BLEND_PATH = os.path.abspath(os.path.join(_SRC_DIR, './etc/empty.blend'))
-BLENDER_SCRIPT_PATH = os.path.abspath(
-    os.path.join(_SRC_DIR, './converter/blender.py'))
-
-assert os.path.exists(EMPTY_BLEND_PATH)
-assert os.path.exists(BLENDER_SCRIPT_PATH)
+EMPTY_BLEND_PATH = utils.RESOURCE_DIR.joinpath('empty.blend')
+BLENDER_SCRIPT_PATH = utils.SRC_DIR.joinpath('converter/blender.py')
+assert EMPTY_BLEND_PATH.exists()
+assert BLENDER_SCRIPT_PATH.exists()
 
 
 def stl_to_obj(obj_path, blender_path=None, *args):
@@ -38,8 +36,9 @@ def stl_to_obj(obj_path, blender_path=None, *args):
   assert os.path.exists(os.path.dirname(blender_path))
 
   run_args = [
-      blender_path, EMPTY_BLEND_PATH, '--background', '--python',
-      BLENDER_SCRIPT_PATH, obj_path
+      blender_path,
+      EMPTY_BLEND_PATH.as_posix(), '--background', '--python',
+      BLENDER_SCRIPT_PATH.as_posix(), obj_path
   ]
   run_args.extend(stl_path)
   subprocess.run(run_args, stdout=subprocess.PIPE)

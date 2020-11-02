@@ -1038,3 +1038,52 @@ def make_external_zone(shape: TopoDS_Shape,
   zone_dict['Ceiling'] = ceiling
 
   return zone, zone_dict
+
+
+def align_model(shape: TopoDS_Shape) -> TopoDS_Shape:
+  """건물 모델의 주요 표면이 xyz 평면과 수평하도록 회전,
+  원점 근처에 위치하도록 평행이동
+
+  Parameters
+  ----------
+  shape : TopoDS_Shape
+      target shape
+
+  Returns
+  -------
+  TopoDS_Shape
+      aligned shape
+  """
+  from OCC.Core.gp import gp_Quaternion
+
+  if not isinstance(shape, TopoDS_Shape):
+    raise TypeError('Need TopoDS_Shape, got {}'.fotmat(type(shape)))
+
+  faces = list(TopologyExplorer(shape).faces())
+  faces_area = [GpropsFromShape(x).surface().Mass() for x in faces]
+  area_argsort = np.argsort(faces_area)
+  faces_sorted = [faces[x] for x in area_argsort[::-1]]
+
+  for face in faces_sorted:
+    plane = _planes_from_faces([face])[0]
+    if plane is None:
+      continue
+
+    norm_gp_dir = plane.Axis().Direction()
+    norm = np.array([norm_gp_dir.X(), norm_gp_dir.Y(), norm_gp_dir.Z()])
+
+    zero_axis_count = np.sum(np.isclose(norm, 0.0))
+
+    if zero_axis_count < 2:
+      arg_sort = np.argsort(norm)
+      align_to = np.array([0.0, 0.0, 0.0])
+      align_to[arg_sort[-1]] = 1.0
+
+      quaternion = gp_Quaternion(gp_Vec(*norm), gp_Vec(*align_to))
+      trsf = gp_Trsf()
+      trsf.SetRotation(quaternion)
+      brep_trnf = BRepBuilderAPI_Transform(shape, trsf, False)
+      rotated = brep_trnf.Shape()
+      return rotated
+
+  return None

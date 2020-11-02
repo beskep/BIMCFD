@@ -22,9 +22,10 @@ def kor_eng_material():
       '유리섬유': 'glass fiber',
       '유리': 'glass'
   }
-  kor_eng_json = json.dumps(kor_eng, indent=4, ensure_ascii=False)
-  with open(mat._KOR_ENG_PATH, 'w', encoding='utf-8-sig') as f:
-    f.write(kor_eng_json)
+  # kor_eng_json = json.dumps(kor_eng, indent=4, ensure_ascii=False)
+  # with open(mat._KOR_ENG_PATH, 'w', encoding='utf-8-sig') as f:
+  #   f.write(kor_eng_json)
+  return kor_eng
 
 
 @pytest.fixture

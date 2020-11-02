@@ -7,12 +7,10 @@ from fluids import friction
 from fuzzywuzzy import fuzz
 from fuzzywuzzy.process import extractOne
 from ht import insulation
+from utils import RESOURCE_DIR
 
-_FILE_DIR = os.path.abspath(os.path.dirname(__file__))
-_DB_PATH = os.path.join(_FILE_DIR, '../etc/material.csv')
-_KOR_ENG_PATH = os.path.join(_FILE_DIR, '../etc/material_kor_eng.json')
-assert os.path.exists(_DB_PATH), _DB_PATH
-assert os.path.exists(_KOR_ENG_PATH), _KOR_ENG_PATH
+DB_PATH = RESOURCE_DIR.joinpath('material.csv')
+KOR_ENG_PATH = RESOURCE_DIR.joinpath('material_kor_eng.json')
 
 
 def load_kor_eng(path):
@@ -25,9 +23,9 @@ class MaterialMatch:
 
   def __init__(self, db_path=None, kor_eng_path=None):
     if db_path is None:
-      db_path = _DB_PATH[:]
+      db_path = DB_PATH
     if kor_eng_path is None:
-      kor_eng_path = _KOR_ENG_PATH[:]
+      kor_eng_path = KOR_ENG_PATH
 
     self._db = pd.read_csv(db_path, engine='python', na_values='-')
     self._names = list(self._db['Name'])

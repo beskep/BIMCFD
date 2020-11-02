@@ -11,6 +11,7 @@ from converter.ifc_converter import IfcConverter
 from interface import topo_widget as wg
 
 
+@pytest.mark.skip
 def test_space_visualization():
   ifc_path = Path(
       r'D:\repo\IFC\DURAARK Datasets\Academic_Autodesk\Academic_Autodesk-AdvancedSampleProject_Arch.ifc'

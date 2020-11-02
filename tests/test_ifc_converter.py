@@ -5,24 +5,26 @@ import ifcopenshell
 import ifcopenshell.geom
 import pytest
 
-_SRC_DIR = os.path.abspath(os.path.join(__file__, '../../src'))
-assert os.path.exists(_SRC_DIR)
-if _SRC_DIR not in sys.path:
-  sys.path.append(_SRC_DIR)
+SRC_DIR = os.path.abspath(os.path.join(__file__, '../../src'))
+assert os.path.exists(SRC_DIR)
+if SRC_DIR not in sys.path:
+  sys.path.append(SRC_DIR)
 
-from converter import openfoam
-from converter import ifc_converter
+from converter import ifc_converter, openfoam
+
+ifc_path = r'D:\repo\IFC\DURAARK Datasets\Academic_Autodesk\Academic_Autodesk-AdvancedSampleProject_Arch.ifc'
+converter = ifc_converter.IfcConverter(ifc_path)
+result_dir = r'D:\CFD\test'
+
+# @pytest.fixture
+# def fixture_converter():
+#   ifc_path = r'D:\repo\IFC\DURAARK Datasets\Academic_Autodesk\Academic_Autodesk-AdvancedSampleProject_Arch.ifc'
+#   assert os.path.exists(ifc_path)
+
+#   return ifc_converter.IfcConverter(ifc_path)
 
 
-@pytest.fixture
-def converter():
-  ifc_path = r'D:\repo\IFC\DURAARK Datasets\Academic_Autodesk\Academic_Autodesk-AdvancedSampleProject_Arch.ifc'
-  assert os.path.exists(ifc_path)
-
-  return ifc_converter.IfcConverter(ifc_path)
-
-
-def test_openfoam_temperature(converter):
+def test_openfoam_temperature():
   target_space = converter.ifc.by_id(3744)
 
   shape, space, walls, openings = converter.convert_space(target_space)
@@ -38,7 +40,7 @@ def test_openfoam_temperature(converter):
     f.write(temperature)
 
 
-def test_get_storey_of_walls(converter: ifc_converter.IfcConverter):
+def test_get_storey_of_walls():
   walls = converter.ifc.by_type('IfcWall')
   for wall in walls[:10]:
     storey = ifc_converter.get_storey(wall)
@@ -46,7 +48,7 @@ def test_get_storey_of_walls(converter: ifc_converter.IfcConverter):
       assert isinstance(storey, ifcopenshell.entity_instance)
 
 
-def test_get_storey_of_slabs(converter: ifc_converter.IfcConverter):
+def test_get_storey_of_slabs():
   slabs = converter.ifc.by_type('IfcSlab')
   for slab in slabs[:5]:
     storey = ifc_converter.get_storey(slab)
@@ -54,8 +56,7 @@ def test_get_storey_of_slabs(converter: ifc_converter.IfcConverter):
       assert isinstance(storey, ifcopenshell.entity_instance)
 
 
-def test_simpl_and_temperature_info(converter: ifc_converter.IfcConverter):
-  result_dir = r'D:\CFD\test'
+def test_simpl_and_temperature_info():
   space = converter.ifc.by_id(3744)
 
   converter.simplify_space(spaces=space,
@@ -79,11 +80,10 @@ def test_simpl_and_temperature_info(converter: ifc_converter.IfcConverter):
     f.writelines(temperature)
 
 
-def test_simplify(converter: ifc_converter.IfcConverter):
+def test_simplify():
   from converter import simplify
   from pprint import pprint
 
-  result_dir = r'D:\CFD\test'
   case_name = 'IfcConvert'
 
   converter.threshold_surface_dist = 5.0
@@ -106,8 +106,7 @@ def test_simplify(converter: ifc_converter.IfcConverter):
   assert exp.number_of_solids() == 1
 
 
-def test_single_openfoam_case(converter: ifc_converter.IfcConverter):
-  result_dir = r'D:\CFD\test'
+def test_single_openfoam_case():
   case_name = 'IfcConvert'
 
   converter.threshold_surface_dist = 5.0
@@ -134,9 +133,7 @@ def test_single_openfoam_case(converter: ifc_converter.IfcConverter):
   assert os.path.exists(os.path.join(result_dir, case_name, 'geometry.obj'))
 
 
-def test_openfoam_case_all_solvers(converter: ifc_converter.IfcConverter):
-  result_dir = r'D:\CFD\test'
-
+def test_openfoam_case_all_solvers():
   converter.threshold_surface_dist = 5.0
   converter.threshold_surface_angle = (3.141592 / 2)
   converter.minimum_match_score = 20
@@ -156,7 +153,7 @@ def test_openfoam_case_all_solvers(converter: ifc_converter.IfcConverter):
     assert os.path.exists(os.path.join(result_dir, case_name, 'geometry.obj'))
 
 
-def test_openfoam_wall_temperature_dict(converter: ifc_converter.IfcConverter):
+def test_openfoam_wall_temperature_dict():
   from collections import OrderedDict
 
   space = converter.ifc.by_id(3744)
@@ -177,7 +174,7 @@ def test_openfoam_wall_temperature_dict(converter: ifc_converter.IfcConverter):
   assert isinstance(bf, OrderedDict)
 
 
-def test_openfoam_rough_wall_nut_dict(converter: ifc_converter.IfcConverter):
+def test_openfoam_rough_wall_nut_dict():
   from collections import OrderedDict
 
   space = converter.ifc.by_id(3744)
@@ -196,7 +193,7 @@ def test_openfoam_rough_wall_nut_dict(converter: ifc_converter.IfcConverter):
   assert isinstance(bf, OrderedDict)
 
 
-def test_openfoam_zero_boundary_field(converter: ifc_converter.IfcConverter):
+def test_openfoam_zero_boundary_field():
   from converter.openfoam import OpenFoamCase
   from copy import deepcopy
 
@@ -242,12 +239,10 @@ def test_openfoam_zero_boundary_field(converter: ifc_converter.IfcConverter):
     assert opening_names_set <= bf_keys
 
 
-def test_external_zone(converter: ifc_converter.IfcConverter):
+def test_external_zone():
   from converter.simplify import make_external_zone
   from converter.obj_convert import write_obj
   from OCC.Core.TopoDS import TopoDS_Shape, TopoDS_Face
-
-  result_dir = r'D:\CFD\test'
 
   space = converter.ifc.by_id(3744)
   converter.threshold_surface_dist = 5.0
@@ -263,7 +258,7 @@ def test_external_zone(converter: ifc_converter.IfcConverter):
   assert isinstance(zone, TopoDS_Shape)
   assert isinstance(zone_faces, dict)
 
-  for key, value in zone_faces:
+  for key, value in zone_faces.items():
     assert isinstance(key, str)
     assert isinstance(value, TopoDS_Face)
 
@@ -279,21 +274,7 @@ def test_external_zone(converter: ifc_converter.IfcConverter):
   assert os.path.exists(obj_path)
 
 
-def test_boundary_field_dict():
-  bfd = openfoam.BoundaryFieldDict()
-
-  bfd['key1'] = 'value1'
-  bfd.add_comment('test comment')
-  bfd.add_empty_line()
-  bfd['key2'] = 'value2'
-  bfd.add_empty_line()
-
-  from pprint import pprint
-
-  pprint(bfd)
-
-
-def test_openfoam_option(converter: ifc_converter.IfcConverter):
+def test_openfoam_option():
   from pprint import pprint
 
   default_options = converter._default_openfoam_options.copy()
@@ -314,4 +295,4 @@ def test_openfoam_option(converter: ifc_converter.IfcConverter):
 
 
 if __name__ == '__main__':
-  pytest.main(['-v', '-s', '-k', 'test_single_openfoam_case'])
+  pytest.main(['-v', '-s', '-k', 'test_external_zone'])

@@ -10,6 +10,7 @@ from butterfly.foamfile import FoamFile
 from butterfly.geometry import bf_geometry_from_stl_file
 from butterfly.refinementRegion import refinementRegions_from_stl_file
 from butterfly.version import Header
+from utils import TEMPLATE_DIR
 
 _DEFAULT_HEADER = \
     r'''/*--------------------------------*- C++ -*----------------------------------*\
@@ -28,11 +29,13 @@ _SOLVERS_ENERGY = ('buoyantSimpleFoam', 'buoyantBousinessqSimpleFoam')
 _SOLVERS_CONDUCTIVITY = ('buoyantSimpleFoam',)
 _SOLVERS_TURBULENCE = ('simpleFoam', 'buoyantSimpleFoam',
                        'buoyantBousinessqSimpleFoam')
-_SOLVER_PATH = {
-    x.lower(): os.path.normpath(os.path.join(_FILE_DIR, '../template', x))
-    for x in _SOLVERS
-}
-assert all([os.path.exists(x) for x in _SOLVER_PATH.values()])
+# _SOLVER_PATH = {
+#     x.lower(): os.path.normpath(os.path.join(_FILE_DIR, '../template', x))
+#     for x in _SOLVERS
+# }
+# assert all([os.path.exists(x) for x in _SOLVER_PATH.values()])
+_SOLVER_PATH = {x.lower(): TEMPLATE_DIR.joinpath(x) for x in _SOLVERS}
+assert all(x.exists() for x in _SOLVER_PATH.values())
 
 
 def supported_solvers() -> Tuple[str]:
@@ -266,7 +269,7 @@ class OpenFoamCase(ButterflyCase):
     if not cls.is_supported_solver(solver):
       raise ValueError('지원하지 않는 solver입니다: {}'.format(solver))
 
-    _case = cls.from_folder(path=_SOLVER_PATH[solver.lower()],
+    _case = cls.from_folder(path=_SOLVER_PATH[solver.lower()].as_posix(),
                             working_dir=save_dir,
                             name=name)
     _case._solver = solver.lower()

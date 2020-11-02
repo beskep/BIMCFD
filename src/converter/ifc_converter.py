@@ -1,36 +1,36 @@
 import json
 import os
 import sys
-from collections import defaultdict, OrderedDict
-from itertools import combinations, chain
+from collections import OrderedDict, defaultdict
+from itertools import chain, combinations
 from shutil import copy2
-from typing import Union, Iterable, List, Tuple
+from typing import Iterable, List, Tuple, Union
 from warnings import warn
 
 import ifcopenshell
 import ifcopenshell.geom
-from OCC.Core.TopoDS import TopoDS_Shape, TopoDS_Compound, TopoDS_Builder
-from OCC.Extend import DataExchange
 from ifcopenshell import entity_instance as IfcEntity
+from OCC.Core.TopoDS import TopoDS_Builder, TopoDS_Compound, TopoDS_Shape
+from OCC.Extend import DataExchange
+from OCC.Extend.TopologyUtils import TopologyExplorer
 
 _SRC_DIR = os.path.abspath(os.path.join(__file__, '../../'))
 assert os.path.exists(_SRC_DIR)
 if _SRC_DIR not in sys.path:
   sys.path.append(_SRC_DIR)
 
-from converter.obj_convert import write_obj
-from converter.openfoam import OpenFoamCase, BoundaryFieldDict
-from converter.simplify import (geometric_features, simplify_space,
-                                compare_shapes, shapes_distance,
-                                make_external_zone, fuse_compound)
+from utils import TEMPLATE_DIR
 
-_SRC_DIR = os.path.abspath(os.path.join(__file__, '../../'))
-PATH_MATERIAL_LAYER = os.path.abspath(
-    os.path.join(_SRC_DIR, './template/material_layer.txt'))
-PATH_TEMPERATURE = os.path.abspath(
-    os.path.join(_SRC_DIR, './template/temperature.txt'))
-assert os.path.exists(PATH_MATERIAL_LAYER)
-assert os.path.exists(PATH_TEMPERATURE)
+from converter.obj_convert import write_obj
+from converter.openfoam import BoundaryFieldDict, OpenFoamCase
+from converter.simplify import (compare_shapes, fuse_compound,
+                                geometric_features, make_external_zone,
+                                shapes_distance, simplify_space)
+
+PATH_MATERIAL_LAYER = TEMPLATE_DIR.joinpath('material_layer.txt')
+PATH_TEMPERATURE = TEMPLATE_DIR.joinpath('temperature.txt')
+assert PATH_MATERIAL_LAYER.exists()
+assert PATH_TEMPERATURE.exists()
 
 
 def to_openfoam_vector(values):
@@ -362,7 +362,15 @@ class IfcConverter:
 
       # surface type
       bf.add_comment('Surface type: "{}"'.format(srf.is_a()))
-      bf.add_empty_line()
+
+      # global id
+      bf.add_comment('Global id: "{}"'.format(srf.GlobalId))
+
+      # storey
+      storey = get_storey(srf)
+      if storey is not None:
+        bf.add_comment('Storey: "{}"'.format(storey.Name))
+        bf.add_empty_line()
 
       if names[idx]:
         # BIM material named
@@ -1082,3 +1090,26 @@ def get_bounded_by(space: IfcEntity):
     return None
 
   return boundaries
+
+
+def write_each_shapes(shape: TopoDS_Compound, save_dir):
+  """compound를 구성하는 각 shape을 저장
+
+  Parameters
+  ----------
+  shape : TopoDS_Compound
+      [description]
+  save_dir : [type]
+      [description]
+  """
+  exp = TopologyExplorer(shape)
+  if exp.number_of_solids() <= 1:
+    return
+
+  if not os.path.exists(save_dir):
+    os.mkdir(save_dir)
+
+  solids = exp.solids()
+  for idx, solid in enumerate(solids):
+    path = os.path.join(save_dir, '{}.stl'.format(idx))
+    DataExchange.write_stl_file(a_shape=solid, filename=path)

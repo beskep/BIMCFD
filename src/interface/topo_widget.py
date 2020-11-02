@@ -3,7 +3,7 @@ from pathlib import Path
 from typing import List
 
 import numpy as np
-from kivy.core.window import Window
+# from kivy.core.window import Window
 from kivy.graphics import (Callback, Color, Mesh, PopMatrix, PushMatrix,
                            RenderContext, Rotate, Scale, Translate,
                            UpdateNormalMatrix)
@@ -16,10 +16,11 @@ _SRC_DIR = Path(__file__).parents[1]
 if str(_SRC_DIR) not in sys.path:
   sys.path.append(str(_SRC_DIR))
 
-from interface.utfapp import UtfApp
+from utils import RESOURCE_DIR
 from interface.topo_mesh import TopoDsMesh
+from interface.utfapp import UtfApp
 
-_GLSL_PATH = _SRC_DIR / 'etc/color.glsl'
+_GLSL_PATH = RESOURCE_DIR.joinpath('color.glsl')
 assert _GLSL_PATH.exists()
 
 
