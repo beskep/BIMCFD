@@ -5,7 +5,7 @@ from kivy.lang.builder import Builder
 from kivymd.app import MDApp
 
 
-def load_kv(path, encoding='utf-8'):
+def load_kv(path, encoding='UTF-8'):
   if not os.path.exists(path):
     raise FileNotFoundError(path)
 
@@ -17,9 +17,9 @@ def load_kv(path, encoding='utf-8'):
 
 class UtfApp(App):
 
-  def run(self, file_path=None):
-    if file_path is not None:
-      kv = load_kv(file_path)
+  def run(self, kv_path=None, encoding='UTF-8'):
+    if kv_path is not None:
+      kv = load_kv(path=kv_path, encoding=encoding)
 
       if kv is not None:
         self.built = True
@@ -28,11 +28,11 @@ class UtfApp(App):
     super(__class__, self).run()
 
 
-class MdUtfApp(App):
+class UtfMDApp(MDApp):
 
-  def run(self, file_path=None):
-    if file_path is not None:
-      kv = load_kv(file_path)
+  def run(self, kv_path=None, encoding='UTF-8'):
+    if kv_path is not None:
+      kv = load_kv(path=kv_path, encoding=encoding)
 
       if kv is not None:
         self.built = True

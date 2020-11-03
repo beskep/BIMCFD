@@ -1,24 +1,14 @@
-import sys
-from pathlib import Path
 from typing import List
 
 import numpy as np
-# from kivy.core.window import Window
-from kivy.graphics import (Callback, Color, Mesh, PopMatrix, PushMatrix,
-                           RenderContext, Rotate, Scale, Translate,
-                           UpdateNormalMatrix)
-from kivy.graphics.opengl import GL_DEPTH_TEST, glDisable, glEnable
+from kivy import graphics
 from kivy.graphics.transformation import Matrix
 from kivy.resources import resource_find
 from kivy.uix.widget import Widget
 
-_SRC_DIR = Path(__file__).parents[1]
-if str(_SRC_DIR) not in sys.path:
-  sys.path.append(str(_SRC_DIR))
-
+from interface.utf_app import UtfApp
+from interface.widgets.topo_mesh import TopoDsMesh
 from utils import RESOURCE_DIR
-from interface.topo_mesh import TopoDsMesh
-from interface.utfapp import UtfApp
 
 _GLSL_PATH = RESOURCE_DIR.joinpath('color.glsl')
 assert _GLSL_PATH.exists()
@@ -33,7 +23,7 @@ class BaseRenderer(Widget):
   def __init__(self, **kwargs):
     super(BaseRenderer, self).__init__(**kwargs)
 
-    self.canvas = RenderContext(compute_normal_mat=True)
+    self.canvas = graphics.RenderContext(compute_normal_mat=True)
     self.canvas.shader.source = resource_find(str(_GLSL_PATH))
 
     self.rotx = None
@@ -41,20 +31,20 @@ class BaseRenderer(Widget):
     self.scale = None
 
     with self.canvas:
-      self.cb = Callback(self.setup_gl_context)
-      PushMatrix()
+      self.cb = graphics.Callback(self.setup_gl_context)
+      graphics.PushMatrix()
       self.setup_scene()
-      PopMatrix()
-      self.cb = Callback(self.reset_gl_context)
+      graphics.PopMatrix()
+      self.cb = graphics.Callback(self.reset_gl_context)
     self.update_glsl()
     self.canvas['diffuse_light'] = (1.0, 1.0, 0.8)
     self.canvas['ambient_light'] = (0.1, 0.1, 0.1)
 
   def setup_gl_context(self, *args):
-    glEnable(GL_DEPTH_TEST)
+    graphics.opengl.glEnable(graphics.opengl.GL_DEPTH_TEST)
 
   def reset_gl_context(self, *args):
-    glDisable(GL_DEPTH_TEST)
+    graphics.opengl.glDisable(graphics.opengl.GL_DEPTH_TEST)
 
   def update_glsl(self):
     asp = self.width / float(self.height)
@@ -70,14 +60,14 @@ class BaseRenderer(Widget):
     # self.canvas['ambient_light'] = (0.1, 0.1, 0.1)
 
   def setup_scene(self):
-    Color(1, 1, 1, 1)
+    graphics.Color(1, 1, 1, 1)
 
-    PushMatrix()
-    Translate(0, 0, -3)
+    graphics.PushMatrix()
+    graphics.Translate(0, 0, -3)
 
-    self.rotx = Rotate(0, 1, 0, 0)
-    self.roty = Rotate(0, 0, 1, 0)
-    self.scale = Scale(1.0)
+    self.rotx = graphics.Rotate(0, 1, 0, 0)
+    self.roty = graphics.Rotate(0, 0, 1, 0)
+    self.scale = graphics.Scale(1.0)
 
     # UpdateNormalMatrix()
     # self.mesh = Mesh(
@@ -86,7 +76,7 @@ class BaseRenderer(Widget):
     #     fmt=m.vertex_format,
     #     mode='triangles',
     # )
-    PopMatrix()
+    graphics.PopMatrix()
 
   def rotate_angle(self, touch):
     x_angle = (touch.dx / self.width) * 360.0 * self.ROTATE_SPEED
@@ -149,20 +139,11 @@ class _TopoDsMesh:
 
 
 class TopoRenderer(BaseRenderer):
+  # TODO: 바깥 창 기준으로 mesh가 위치하게 수정
 
   DEFAULT_SCALE = 0.25
 
   def __init__(self, shapes: List[TopoDsMesh] = None, **kwargs):
-    # if shapes:
-    #   self.shapes = [_TopoDsMesh(x) for x in shapes]
-
-    #   bboxs = np.array([x.bbox for x in self.shapes])
-    #   bbox = np.vstack([np.min(bboxs, axis=0), np.max(bboxs, axis=0)])
-    #   center = np.average(bbox, axis=0)
-    #   for shape in self.shapes:
-    #     shape.to_center(center)
-    # else:
-    #   self.shapes = []
     self.save_shapes(shapes)
 
     super(TopoRenderer, self).__init__(**kwargs)
@@ -197,22 +178,22 @@ class TopoRenderer(BaseRenderer):
     self.mesh = []
 
     for shape in self.shapes:
-      Color(*shape.color)
+      graphics.Color(*shape.color)
 
-      PushMatrix()
-      Translate(0, 0, -3)
+      graphics.PushMatrix()
+      graphics.Translate(0, 0, -3)
 
-      self.rotx.append(Rotate(0, 1, 0, 0))
-      self.roty.append(Rotate(0, 0, 1, 0))
-      self.scale.append(Scale(self.DEFAULT_SCALE))
+      self.rotx.append(graphics.Rotate(0, 1, 0, 0))
+      self.roty.append(graphics.Rotate(0, 0, 1, 0))
+      self.scale.append(graphics.Scale(self.DEFAULT_SCALE))
 
-      UpdateNormalMatrix()
-      mesh = Mesh(vertices=shape.mesh_vertices,
-                  indices=shape.mesh_index,
-                  fmt=shape.mesh_format,
-                  mode='triangles')
+      graphics.UpdateNormalMatrix()
+      mesh = graphics.Mesh(vertices=shape.mesh_vertices,
+                           indices=shape.mesh_index,
+                           fmt=shape.mesh_format,
+                           mode='triangles')
       self.mesh.append(mesh)
-      PopMatrix()
+      graphics.PopMatrix()
 
   def on_touch_move(self, touch):
     ax, ay = self.rotate_angle(touch)

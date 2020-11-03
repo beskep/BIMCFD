@@ -1,0 +1,37 @@
+#:kivy 1.11
+
+<ViewPanel@MDBoxLayout>:
+    BIMCFDPanel:
+        MDBottomNavigation:
+            MDBottomNavigationItem:
+                name: 'visualization'
+                text: '시각화'
+                icon: 'vector-union'
+                FloatLayout:
+                    MDBoxLayout:
+                        id: vis_layout
+                        # TopoRenderer:
+                        #     id: vis
+                    AnchorLayout:
+                        anchor_x: 'right'
+                        anchor_y: 'bottom'
+                        padding: dp(10)
+                        id: spinner_layout
+                        # MDSpinner:
+                        #     id: spinner
+                        #     size_hint: None, None
+                        #     size: dp(50), dp(50)
+                        #     active: False
+            MDBottomNavigationItem:
+                name: 'geom_stat'
+                text: '형상 정보'
+                icon: 'file-cad-box'
+                MDBoxLayout:
+                    id: geom_table
+            MDBottomNavigationItem:
+                name: 'material'
+                text: '재료 정보'
+                # icon: 'file-table-outline'
+                icon: 'wall'
+                MDBoxLayout:
+                    id: material_table

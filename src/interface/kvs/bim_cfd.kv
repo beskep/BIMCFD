@@ -1,0 +1,44 @@
+#:kivy 1.11
+
+<MDRaisedButton>:
+    pos_hint: {'center_y': 0.5}
+<MDLabel>:
+    pos_hint: {'center_y': 0.5}
+<MDTextField>:
+    pos_hint: {'center_y': 0.5}
+<MDDropDownItem>:
+    pos_hint: {'center_y': 0.5}
+
+<TextFieldFont>:
+    font_name: 'NotoSansKR'
+
+<DropDownMenu>:
+    font_name: 'NotoSansKR'
+
+<BIMCFDPanel@MDCard>:
+    elevation: 1
+
+<BimCfdWidget>:
+    # MDBoxLayout:
+    orientation: 'horizontal'
+    padding: dp(10)
+    spacing: dp(10)
+    
+    MDBoxLayout:
+        orientation: 'vertical'
+        spacing: dp(10)
+    
+        FilePanel:
+            id: file_panel
+            size_hint_y: 1.5
+        SimplificationPanel:
+            id: simplification_panel
+            size_hint_y: 2.5
+        CFDPanel:
+            id: cfd_panel
+            size_hint_y: 1
+
+    ViewPanel:
+        id: view_panel
+        size_hint_x: 1.5
+    

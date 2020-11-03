@@ -1,0 +1,62 @@
+#:kivy 1.11
+
+<FilePanel@MDBoxLayout>:
+    BIMCFDPanel:
+        MDGridLayout:
+            cols: 1
+            padding: dp(10)
+
+            PanelTitle:
+                icon: 'folder-outline'
+                text: 'BIM 모델'
+            MDSeparator:
+                height: dp(1)
+                size_hint_y: None
+            
+            MDBoxLayout:
+                orientation: 'vertical'
+                padding: dp(10)
+                spacing: dp(10)
+
+                MDBoxLayout:
+                    orientation: 'horizontal'
+                    spacing: dp(5)
+
+                    TextFieldPath:
+                        id: bim_path
+                        hint_text: 'BIM 파일 경로'
+                        helper_text_mode: 'on_error'
+                        # on_text: app.check_bim_path_exist(self.text)
+                    MDRaisedButton:
+                    # MDRectangleFlatIconButton:
+                        text: '파일 선택'
+                        # icon: 'home-import-outline'
+                        on_release: app.open_file_manager('bim')
+
+                MDBoxLayout:
+                    orientation: 'horizontal'
+                    spacing: dp(5)
+
+                    TextFieldPath:
+                        id: save_dir
+                        hint_text: '저장 경로'            
+                    MDRaisedButton:
+                    # MDRectangleFlatIconButton:
+                        text: '폴더 선택'
+                        # icon: 'content-save-edit'
+                        width: dp(20)
+                        on_release: app.open_file_manager('save')
+                
+                MDBoxLayout:
+                    MDLabel:
+                        text: '대상 공간'
+                        size_hint_x: 1
+                    DropDownMenu:
+                        id: space
+                        text: '선택'
+                        text_width: 50
+                        size_hint_x: 2
+                    MDRaisedButton:
+                        text: '시각화'
+                        size_hint_x: 1
+                        on_release: app.select_and_visualize_space()

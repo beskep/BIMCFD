@@ -1113,3 +1113,12 @@ def write_each_shapes(shape: TopoDS_Compound, save_dir):
   for idx, solid in enumerate(solids):
     path = os.path.join(save_dir, '{}.stl'.format(idx))
     DataExchange.write_stl_file(a_shape=solid, filename=path)
+
+
+def entity_name(entity: IfcEntity) -> str:
+  if hasattr(entity, 'LongName') and entity.LongName is not None:
+    res = '{} ({})'.format(entity.Name, entity.LongName)
+  else:
+    res = entity.Name
+    assert isinstance(res, str)
+  return res

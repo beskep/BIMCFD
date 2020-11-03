@@ -1,0 +1,42 @@
+#:kivy 1.11
+
+<CFDPanel@MDBoxLayout>:
+    BIMCFDPanel:
+        orientation: 'vertical'
+        padding: dp(10)
+
+        PanelTitle:
+            icon: 'weather-windy'
+            text: 'CFD'
+        MDSeparator:
+            height: dp(1)
+            size_hint_y: None
+
+        MDBoxLayout:
+            orientation: 'vertical'
+
+            MDBoxLayout:
+                # padding: dp(10)
+                spacing: dp(10)
+            
+                MDLabel:
+                    text: 'CFD Solver'
+                    size_hint_x: 1
+                DropDownMenu:
+                    id: solver
+                    text: 'buoyantSimpleFoam'
+                    text_width: 50
+                    size_hint_x: 3
+                
+            MDBoxLayout:
+                spacing: dp(10)
+        
+                MDRaisedButton:
+                    text: 'CFD 해석 설정'
+                    # on_release: app.activate_spinner(False)
+            
+                MDRaisedButton:
+                    text: '변환'
+                    size_hint_x: 1
+                    #   on_release: app.test_add_tables()
+                    # on_release: app.activate_spinner()
