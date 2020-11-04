@@ -38,6 +38,7 @@ from OCCUtils.face import Face
 def make_box(*args):
   box = BRepPrimAPI_MakeBox(*args)
   box.Build()
+
   return box.Shape()
 
 
@@ -45,35 +46,44 @@ def get_boundingbox(shape, tol=1e-4):
   bbox = Bnd_Box()
   bbox.SetGap(tol)
   brepbndlib_Add(shape, bbox)
+
   return bbox.Get()
 
 
 def common_volume(shape1, shape2):
   common = BRepAlgoAPI_Common(shape1, shape2).Shape()
+
   if common is None:
     res = 0.0
   else:
     res = GpropsFromShape(common).volume().Mass()
+
   return res
 
 
 def fix_shape(shape: TopoDS_Shape, precision=None):
   fix = ShapeFix_Shape()
   fix.Init(shape)
+
   if precision:
     fix.Precision(precision)
+
   fix.Perform()
+
   return fix.Shape()
 
 
 def _maker_volume_sequential_helper(shape, plane, fuzzy):
   mv = BOPAlgo_MakerVolume()
   mv.SetRunParallel(True)
+
   if fuzzy:
     mv.SetFuzzyValue(fuzzy)
+
   mv.AddArgument(shape)
   mv.AddArgument(plane)
   mv.Perform()
+
   return mv.Shape()
 
 
@@ -82,6 +92,7 @@ def maker_volume_sequential(shape,
                             fuzzy=0.0,
                             verbose=False):
   it = tqdm(planes) if verbose else planes
+
   for plane in it:
     shape = _maker_volume_sequential_helper(shape, plane, fuzzy)
 
@@ -107,11 +118,15 @@ def maker_volume(shapes: Collection, boundary: TopoDS_Shape = None, fuzzy=0.0):
 
   mv = BOPAlgo_MakerVolume()
   mv.SetRunParallel(True)
+
   if fuzzy:
     mv.SetFuzzyValue(fuzzy)
+
   ls = TopTools_ListOfShape()
+
   for shape in shapes:
     ls.Append(shape)
+
   mv.SetArguments(ls)
   mv.Perform()
   result = fix_shape(mv.Shape())
@@ -140,6 +155,7 @@ def _is_in(solid, pnt: gp_Pnt, tol=0.001, on=True) -> bool:
   result = classifier.State()
   result = result in [TopAbs_IN, TopAbs_ON] if on else result == TopAbs_IN
   classifier.Destroy()
+
   return result
 
 
@@ -173,14 +189,13 @@ def _calc_split_vol_ratio(split_original: TopoDS_Compound,
   center_buffer = [p.CentreOfMass() for p in props_buffer]
   center_buffer = np.array([[p.X(), p.Y(), p.Z()] for p in center_buffer])
 
-  center_buffer_ = np.repeat(
-      center_buffer, center_original.shape[0],
-      axis=0).reshape([center_buffer.shape[0], center_original.shape[0], 3])
-  center_original_ = np.tile(center_original,
-                             (center_buffer.shape[0], 1)).reshape([
-                                 center_buffer.shape[0],
-                                 center_original.shape[0], 3
-                             ])
+  center_buffer_ = np.repeat(center_buffer, center_original.shape[0], axis=0)
+  center_buffer_ = center_buffer_.reshape(
+      [center_buffer.shape[0], center_original.shape[0], 3])
+
+  center_original_ = np.tile(center_original, (center_buffer.shape[0], 1))
+  center_original_ = center_original_.reshape(
+      [center_buffer.shape[0], center_original.shape[0], 3])
 
   # 각 buffer의 solid에 대한 original의 solid의 거리
   # todo: 거리 말고 다른 판단방법으로 바꾸기
@@ -205,7 +220,9 @@ def _calc_split_vol_ratio(split_original: TopoDS_Compound,
   # vol_ratio = vol_original[closest] / vol_buffer
   # vol_ratio[np.logical_not(is_in)] = 0.0
 
-  assert np.all(vol_ratio >= -1e-4) and np.all(vol_ratio <= 1.001)
+  assert np.all(vol_ratio >= -1e-4)
+  assert np.all(vol_ratio <= 1.001)
+
   return vol_ratio
 
 
@@ -213,6 +230,7 @@ def _find_matching_solid(argsort, buffer_solid, original_center):
   for idx in argsort:
     if _is_in(buffer_solid, original_center[idx], on=False):
       return idx
+
   return np.nan
 
 
@@ -270,6 +288,7 @@ def _planes_from_faces(faces: List[TopoDS_Shape]) -> List[Geom_Plane]:
   """
   surfaces = [BRep_Tool_Surface(face) for face in faces]
   planes = [Geom_Plane.DownCast(surface) for surface in surfaces]
+
   return planes
 
 
@@ -322,8 +341,10 @@ def split_by_faces(shape: TopoDS_Shape,
 
   if not step:
     splitter.AddArgument(shape)
+
     for face in faces:
       splitter.AddTool(face)
+
     splitter.Perform()
     result = splitter.Shape()
   else:
@@ -335,6 +356,7 @@ def split_by_faces(shape: TopoDS_Shape,
       splitter.Perform()
       shape = splitter.Shape()
       splitter.Clear()
+
     result = shape
 
   return result
@@ -436,11 +458,13 @@ def sew_faces(shape: TopoDS_Shape, tol=1e-3) -> TopoDS_Solid:
   :return: TopoDS_Solid
   """
   sew = BRepBuilderAPI_Sewing(tol)
+
   for face in TopologyExplorer(shape).faces():
     sew.Add(face)
 
   sew.Perform()
   solid = BRepBuilderAPI_MakeSolid(sew.SewedShape()).Solid()
+
   return solid
 
 
@@ -458,6 +482,7 @@ def fuse_compound(target: Union[List, TopoDS_Shape]):
     tools = TopTools_ListOfShape()
 
     arguments.Append(target[0])
+
     for solid in target[1:]:
       tools.Append(solid)
 
@@ -512,25 +537,25 @@ def classify_minor_faces(area: np.ndarray,
     op_norm = op_norm / np.linalg.norm(op_norm, axis=1).reshape([-1, 1])
 
     # 두 face가 평행한지 (법선 내적이 1인지) 확인
-    norm_ = np.repeat(norm, op_norm.shape[0],
-                      axis=0).reshape([norm.shape[0], op_norm.shape[0], 3])
-    op_norm_ = np.tile(op_norm, (norm.shape[0], 1)).reshape(
-        [norm.shape[0], op_norm.shape[0], 3])
+    norm_ = np.repeat(norm, op_norm.shape[0], axis=0)
+    norm_ = norm_.reshape([norm.shape[0], op_norm.shape[0], 3])
+    op_norm_ = np.tile(op_norm, (norm.shape[0], 1))
+    op_norm_ = op_norm_.reshape([norm.shape[0], op_norm.shape[0], 3])
     is_parallel = np.isclose(np.abs(np.sum(norm_ * op_norm_, axis=2)), 1.0)
 
     # 두 face가 동일 평면에 존재하는지 (중앙점 간 벡터와 법선의 내적 0) 확인
-    center_ = np.repeat(center, op_center.shape[0], axis=0).reshape(
-        [center.shape[0], op_center.shape[0], 3])
-    op_center_ = np.tile(op_center, (center.shape[0], 1)).reshape(
-        [center.shape[0], op_center.shape[0], 3])
+    center_ = np.repeat(center, op_center.shape[0], axis=0)
+    center_ = center_.reshape([center.shape[0], op_center.shape[0], 3])
+    op_center_ = np.tile(op_center, (center.shape[0], 1))
+    op_center_ = op_center_.reshape([center.shape[0], op_center.shape[0], 3])
     is_coplanar = np.isclose(np.sum(norm_ * (center_ - op_center_), axis=2),
                              0.0)
 
     # 두 face의 면적이 동일한지 확인
-    area_ = np.repeat(area, op_area.shape[0],
-                      axis=0).reshape([area.shape[0], op_area.shape[0]])
-    op_area_ = np.tile(op_area,
-                       area.shape[0]).reshape([area.shape[0], op_area.shape[0]])
+    area_ = np.repeat(area, op_area.shape[0], axis=0)
+    area_ = area_.reshape([area.shape[0], op_area.shape[0]])
+    op_area_ = np.tile(op_area, area.shape[0])
+    op_area_ = op_area_.reshape([area.shape[0], op_area.shape[0]])
     is_same_area = np.isclose(area_, op_area_)
 
     # 세 기준 모두 일치하는 face를 opening face로 판단
@@ -544,7 +569,7 @@ def classify_minor_faces(area: np.ndarray,
   # 주요 face/생략 대상 face 판단
   # 판단 순서는 1. 면적이 큰 순서대로,
   # 면적이 동일할 경우 2. 다른 면들과 각도가 비슷한 순서대로
-  # todo: opening face는 아예 기준에서 빼버리기
+  # TODO: opening face는 아예 기준에서 빼버리기?
   for idx in np.lexsort([-avg_cos, -area]):
     if idx in minor_faces or (openings and idx in opening_face_idx):
       continue
@@ -571,13 +596,14 @@ def classify_minor_faces(area: np.ndarray,
   return minor_faces
 
 
-def merge_inner_volume(shape: TopoDS_Shape,
-                       threshold_internal_volume=0.0,
-                       threshold_internal_length: Union[float, list,
-                                                        np.ndarray] = 0.0,
-                       brep_deflection: Union[Tuple[float], float] = (1.0, 0.5),
-                       tol_bbox=1e-8,
-                       tol_cut=0.0):
+def merge_inner_volume(
+    shape: TopoDS_Shape,
+    threshold_internal_volume=0.0,
+    threshold_internal_length: Union[float, list, np.ndarray] = 0.0,
+    brep_deflection: Union[Tuple[float], float] = (1.0, 0.5),
+    tol_bbox=1e-8,
+    tol_cut=0.0,
+):
   """
   shape의 내부 빈 공간 (e.g. 기둥) 중 기준을 충족하는 공간을 단순화
   단순화 대상 공간이 없으면 None을 반환
@@ -608,6 +634,7 @@ def merge_inner_volume(shape: TopoDS_Shape,
 
   if TopologyExplorer(shape).number_of_solids() < 1:
     shape = sew_faces(shape)
+
     if TopologyExplorer(shape).number_of_solids() < 1:
       raise ValueError('단순화 대상 shape에 solid가 없습니다.')
 
@@ -625,6 +652,7 @@ def merge_inner_volume(shape: TopoDS_Shape,
   algo_cut = BRepAlgoAPI_Cut(bbox, shape)
   if tol_cut:
     algo_cut.SetFuzzyValue(tol_cut)
+
   cut_shape = algo_cut.Shape()
 
   if cut_shape is None:
@@ -665,7 +693,7 @@ def merge_inner_volume(shape: TopoDS_Shape,
 
     # 내외부 점 / 부피 판단 (Convex Hull)
     hull = ConvexHull(np.vstack([pnts_cut, pnts_original]))
-    # todo: coplanar 점 고려
+    # TODO: coplanar 점 고려
 
     outer_pnts = hull.vertices[hull.vertices < pnts_cut.shape[0]]
     outer_solid_idx = np.unique(solid_idx[outer_pnts])
@@ -683,6 +711,7 @@ def merge_inner_volume(shape: TopoDS_Shape,
     # 내부 shape의 최소 edge 길이 추출
     inner_exp = [TopologyExplorer(solid) for solid in inner_solids]
     inner_edges = [list(exp.edges()) for exp in inner_exp]
+
     inner_min_length = np.array([
         np.min([GpropsFromShape(edge).linear().Mass()
                 for edge in edges])
@@ -761,8 +790,12 @@ def merge_minor_faces(shape: TopoDS_Shape,
   area, norm, norm_gp, center, center_gp = face_info(faces)
 
   # buffer를 split하지 않는 (=생략되는) face
-  minor_faces = classify_minor_faces(area, center, norm, threshold_dist,
-                                     threshold_cos, openings)
+  minor_faces = classify_minor_faces(area=area,
+                                     center=center,
+                                     norm=norm,
+                                     threshold_dist=threshold_dist,
+                                     threshold_cos=threshold_cos,
+                                     openings=openings)
 
   # 단순화 대상 face (minor_faces)가 있을 경우 단순화 시행
   if minor_faces:
@@ -801,8 +834,8 @@ def merge_minor_faces(shape: TopoDS_Shape,
     step = (split_limit is not None and len(major_planes) >= split_limit)
     # split_original = split_by_faces(
     #   fix_shape(shape), major_planes, parallel=True, step=step)
-    split_buffer = split_by_faces(buffer,
-                                  major_planes,
+    split_buffer = split_by_faces(shape=buffer,
+                                  faces=major_planes,
                                   parallel=True,
                                   step=step)
     split_buffer = fix_shape(split_buffer)
@@ -852,21 +885,22 @@ def merge_minor_faces(shape: TopoDS_Shape,
   return simplified_shape
 
 
-def simplify_space(shape: TopoDS_Shape,
-                   openings: List[TopoDS_Shape] = None,
-                   brep_deflection=(1.0, 0.5),
-                   threshold_internal_volume=0.0,
-                   threshold_internal_length: Union[float, list,
-                                                    np.ndarray] = 0.0,
-                   threshold_surface_dist=0.0,
-                   threshold_surface_angle=0.0,
-                   threshold_surface_vol_ratio=0.5,
-                   relative_threshold=False,
-                   fuzzy=0.0,
-                   tol_bbox=1e-8,
-                   tol_cut=0.0,
-                   buffer_size=2,
-                   split_limit=None) -> TopoDS_Shape:
+def simplify_space(
+    shape: TopoDS_Shape,
+    openings: List[TopoDS_Shape] = None,
+    brep_deflection=(1.0, 0.5),
+    threshold_internal_volume=0.0,
+    threshold_internal_length: Union[float, list, np.ndarray] = 0.0,
+    threshold_surface_dist=0.0,
+    threshold_surface_angle=0.0,
+    threshold_surface_vol_ratio=0.5,
+    relative_threshold=False,
+    fuzzy=0.0,
+    tol_bbox=1e-8,
+    tol_cut=0.0,
+    buffer_size=2,
+    split_limit=None,
+) -> TopoDS_Shape:
   """
   형상 단순화 함수. 내부 빈 공간 단순화와 외부 표면 단순화를 순차적으로 실행
 
@@ -920,6 +954,7 @@ def simplify_space(shape: TopoDS_Shape,
         brep_deflection=brep_deflection,
         tol_bbox=tol_bbox,
         tol_cut=tol_cut)
+
     if simplified_shape:
       flag_simplified = True
       shape = fix_shape(simplified_shape)
@@ -936,6 +971,7 @@ def simplify_space(shape: TopoDS_Shape,
         tol_bbox=tol_bbox,
         buffer_size=buffer_size,
         split_limit=split_limit)
+
     if simplified_shape:
       flag_simplified = True
       shape = fix_shape(simplified_shape)
@@ -976,12 +1012,14 @@ def geometric_features(shape: TopoDS_Shape):
 
   volume = gprops.volume().Mass()
   area = gprops.surface().Mass()
+
   features = OrderedDict([('volume', volume), ('area', area),
                           ('characteristic_length', volume / area),
                           ('solid_count', exp.number_of_solids()),
                           ('face_count', exp.number_of_faces()),
                           ('edge_count', exp.number_of_edges()),
                           ('vertex_count', exp.number_of_vertices())])
+
   return features
 
 
@@ -1084,6 +1122,7 @@ def align_model(shape: TopoDS_Shape) -> TopoDS_Shape:
       trsf.SetRotation(quaternion)
       brep_trnf = BRepBuilderAPI_Transform(shape, trsf, False)
       rotated = brep_trnf.Shape()
+
       return rotated
 
   return None

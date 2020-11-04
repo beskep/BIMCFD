@@ -23,8 +23,8 @@ DEFAULT_BLENDER_PATH = r'C:\Program Files\Blender Foundation\Blender\blender'
 
 EMPTY_BLEND_PATH = utils.RESOURCE_DIR.joinpath('empty.blend')
 BLENDER_SCRIPT_PATH = utils.SRC_DIR.joinpath('converter/blender.py')
-assert EMPTY_BLEND_PATH.exists()
-assert BLENDER_SCRIPT_PATH.exists()
+assert EMPTY_BLEND_PATH.exists(), EMPTY_BLEND_PATH
+assert BLENDER_SCRIPT_PATH.exists(), BLENDER_SCRIPT_PATH
 
 
 def stl_to_obj(obj_path, blender_path=None, *args):
@@ -37,8 +37,11 @@ def stl_to_obj(obj_path, blender_path=None, *args):
 
   run_args = [
       blender_path,
-      EMPTY_BLEND_PATH.as_posix(), '--background', '--python',
-      BLENDER_SCRIPT_PATH.as_posix(), obj_path
+      EMPTY_BLEND_PATH.as_posix(),
+      '--background',
+      '--python',
+      BLENDER_SCRIPT_PATH.as_posix(),
+      obj_path,
   ]
   run_args.extend(stl_path)
   subprocess.run(run_args, stdout=subprocess.PIPE)
@@ -55,10 +58,9 @@ def _bbox_ndarray(shape):
 
 
 def is_same_face(op_faces, op_norm, op_center, srf_norm, srf_center, tol):
-  dot = np.abs(
-      np.sum(op_norm.reshape([-1, 1, 3]) *
-             (op_center.reshape([-1, 1, 3]) - srf_center),
-             axis=2))
+  vec = (op_norm.reshape([-1, 1, 3]) *
+         (op_center.reshape([-1, 1, 3]) - srf_center))
+  dot = np.abs(np.sum(vec, axis=2))
   is_coplanar = np.isclose(dot, 0.0, atol=tol)
 
   op_norm = op_norm / np.linalg.norm(op_norm, axis=1).reshape([-1, 1])
@@ -163,7 +165,6 @@ class ObjConverter:
 
           # 공간과 거리가 떨어져 있는 face (= inlet / outlet) 판단
           dist = [shapes_distance(face, self._space, tol) for face in faces]
-
           opening_face = [f for f, d in zip(faces, dist) if d > tol]
 
         else:
@@ -174,6 +175,7 @@ class ObjConverter:
           area = [GpropsFromShape(x).surface().Mass() for x in common]
 
           opening_face = [f for f, a in zip(faces, area) if a >= tol]
+
           if len(opening_face) > 1:
             opening_face = faces
 
@@ -185,14 +187,15 @@ class ObjConverter:
         _, sur_norm, _, sur_center, _ = face_info(self._obj_surface)
 
         # 표면(벽), 중 opening에 해당하는 면 추출
-        surface_opening_mask = is_same_face(self._obj_opening, op_norm,
-                                            op_center, sur_norm, sur_center,
-                                            tol)
+        surface_opening_mask = is_same_face(op_faces=self._obj_opening,
+                                            op_norm=op_norm,
+                                            op_center=op_center,
+                                            srf_norm=sur_norm,
+                                            srf_center=sur_center,
+                                            tol=tol)
 
-        surface_closest_opening = np.argmin(np.sum(
-            np.square(op_center.reshape([-1, 1, 3]) - sur_center), axis=2),
-                                            axis=0)
-
+        distsq = np.square(op_center.reshape([-1, 1, 3]) - sur_center)
+        surface_closest_opening = np.argmin(np.sum(distsq, axis=2), axis=0)
         surface_opening_idx = np.argwhere(np.any(surface_opening_mask, axis=0))
 
         if opening_volume:
@@ -206,12 +209,16 @@ class ObjConverter:
         else:
           # interior 중 opening에 해당하는 면 추출
           _, intr_norm, _, intr_center, _ = face_info(self._obj_interior)
-          intr_opening_mask = is_same_face(self._obj_opening, op_norm,
-                                           op_center, intr_norm, intr_center,
-                                           tol)
-          intr_closest_opening = np.argmin(np.sum(
-              np.square(op_center.reshape([-1, 1, 3]) - intr_center), axis=2),
-                                           axis=0)
+
+          intr_opening_mask = is_same_face(op_faces=self._obj_opening,
+                                           op_norm=op_norm,
+                                           op_center=op_center,
+                                           srf_norm=intr_norm,
+                                           srf_center=intr_center,
+                                           tol=tol)
+
+          distsq = np.square(op_center.reshape([-1, 1, 3]) - intr_center)
+          intr_closest_opening = np.argmin(np.sum(distsq, axis=2), axis=0)
           intr_opening_idx = np.argwhere(np.any(intr_opening_mask, axis=0))
 
           opening_from_surface = [(surface_closest_opening[i], f)
@@ -229,9 +236,12 @@ class ObjConverter:
           # 표면(벽) 중 opening 부피와 일치하는 표면 제거
           op_vol_faces = list(chain.from_iterable(self._op_faces))
           _, op_vol_norm, _, op_vol_center, _ = face_info(op_vol_faces)
-          surface_opening_vol_mask = is_same_face(op_vol_faces, op_vol_norm,
-                                                  op_vol_center, sur_norm,
-                                                  sur_center, tol)
+          surface_opening_vol_mask = is_same_face(op_faces=op_vol_faces,
+                                                  op_norm=op_vol_norm,
+                                                  op_center=op_vol_center,
+                                                  srf_norm=sur_norm,
+                                                  srf_center=sur_center,
+                                                  tol=tol)
 
           surface_opening_vol_idx = np.argwhere(
               np.any(surface_opening_vol_mask, axis=0))
@@ -244,6 +254,7 @@ class ObjConverter:
   def classify_walls(self, tol):
     if self._walls is None:
       return
+
     else:
       # 각 surface에 대해 가장 가까운 wall의 번호 계산
       center_gp = [
@@ -377,8 +388,10 @@ def fix_surface_name(obj_path):
                  re.IGNORECASE | re.MULTILINE | re.DOTALL)
 
   new_geom = [None for _ in range(len(geom))]
+
   for idx, line in enumerate(geom):
     new_geom[idx] = p.sub('\\2', line)
+
   assert all([x is not None for x in new_geom])
 
   if new_geom != geom:
@@ -433,4 +446,5 @@ def write_obj(compound: TopoDS_Compound,
                           tol=tol,
                           extract_interior=extract_interior,
                           deflection=deflection)
+
   return converter.valid_surfaces()

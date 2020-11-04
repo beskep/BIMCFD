@@ -1,6 +1,5 @@
 import json
 import os
-import sys
 from collections import OrderedDict, defaultdict
 from itertools import chain, combinations
 from shutil import copy2
@@ -14,13 +13,8 @@ from OCC.Core.TopoDS import TopoDS_Builder, TopoDS_Compound, TopoDS_Shape
 from OCC.Extend import DataExchange
 from OCC.Extend.TopologyUtils import TopologyExplorer
 
-_SRC_DIR = os.path.abspath(os.path.join(__file__, '../../'))
-assert os.path.exists(_SRC_DIR)
-if _SRC_DIR not in sys.path:
-  sys.path.append(_SRC_DIR)
-
 from utils import TEMPLATE_DIR
-
+from converter.material_match import MaterialMatch
 from converter.obj_convert import write_obj
 from converter.openfoam import BoundaryFieldDict, OpenFoamCase
 from converter.simplify import (compare_shapes, fuse_compound,
@@ -29,8 +23,8 @@ from converter.simplify import (compare_shapes, fuse_compound,
 
 PATH_MATERIAL_LAYER = TEMPLATE_DIR.joinpath('material_layer.txt')
 PATH_TEMPERATURE = TEMPLATE_DIR.joinpath('temperature.txt')
-assert PATH_MATERIAL_LAYER.exists()
-assert PATH_TEMPERATURE.exists()
+assert PATH_MATERIAL_LAYER.exists(), PATH_MATERIAL_LAYER
+assert PATH_TEMPERATURE.exists(), PATH_MATERIAL_LAYER
 
 
 def to_openfoam_vector(values):
@@ -50,19 +44,7 @@ class IfcConverter:
                wall_types=('IfcWall',),
                slab_types=('IfcSlab',),
                covering_types=('IfcCovering',)):
-    if not str(path).endswith('.ifc'):
-      path = str(path) + '.ifc'
-
-    # if not os.path.exists(path):
-    #   src_path = os.path.join(_FILE_DIR, '../src', path)
-
-    #   if not os.path.exists(src_path):
-    #     raise FileNotFoundError(path)
-
-    #   path = src_path
-
     self._file_path = os.path.normpath(path)
-
     self._ifc = ifcopenshell.open(self._file_path)
     self._settings = ifcopenshell.geom.settings()
     self._settings.set(self._settings.USE_PYTHON_OPENCASCADE, True)
@@ -92,7 +74,6 @@ class IfcConverter:
     self.tol_bbox = 1e-8
     self.tol_cut = 0.0
 
-    # self._material_match = MaterialMatch()
     self._material_match = None
     self._min_match_score = None
 
@@ -136,6 +117,12 @@ class IfcConverter:
     }
     self._of_options.update(essential)
     self._of_options.update(kwargs)
+
+  @property
+  def materiam_match(self) -> MaterialMatch:
+    if self._material_match is None:
+      self._material_match = MaterialMatch()
+    return self._material_match
 
   @property
   def minimum_match_score(self):
@@ -242,7 +229,7 @@ class IfcConverter:
 
     matched_name = [x[2] for x in matched]
     conductivity = [x[0]['k'] for x in matched]
-    score = [self._material_match.scorer(x[1], x[2]) for x in matched]
+    score = [self.materiam_match.scorer(x[1], x[2]) for x in matched]
 
     return matched_name, conductivity, score
 
@@ -252,14 +239,10 @@ class IfcConverter:
     if remove_na:
       layer_info = layer_info_without_na
 
-    if self._material_match is None:
-      from converter.material_match import MaterialMatch
-      self._material_match = MaterialMatch()
-
     unique_names = set(
         [x[0].lower() for x in chain.from_iterable(layer_info_without_na)])
     match_dict = {
-        x: self._material_match.thermal_properties(x) for x in unique_names
+        x: self.materiam_match.thermal_properties(x) for x in unique_names
     }
 
     matched = [
@@ -456,7 +439,7 @@ class IfcConverter:
     layer_info = [self._layers_info(x) for x in surface]
     # 가장 첫번째 재료 이름을 추출함
     first_material = [x[0][0] if x else None for x in layer_info]
-    friction_match = [self._material_match.friction(x) for x in first_material]
+    friction_match = [self.materiam_match.friction(x) for x in first_material]
 
     roughness = [x[0] for x in friction_match]
     material_name = [x[1] for x in friction_match]
@@ -524,6 +507,7 @@ class IfcConverter:
     if target_fields:
       bf_names = [x.name for x in ffs]
       invalid_fields = [x for x in target_fields if x not in bf_names]
+
       if invalid_fields:
         raise ValueError('Invalid target boundary fields: {}'.format(
             str(invalid_fields)))
@@ -534,7 +518,7 @@ class IfcConverter:
       ffs = [x for x in ffs if x.name not in drop_fields]
 
     wall_names = [
-        x if x.startswith('Surface_') else 'Surface_' + x for x in wall_names
+        (x if x.startswith('Surface_') else 'Surface_' + x) for x in wall_names
     ]
 
     for ff in ffs:
@@ -761,7 +745,6 @@ class IfcConverter:
     walls.extend(slabs)
     wall_names.extend(slab_names)
 
-    # wall_shapes = [self.create_geometry(x) for x in walls]
     def _geom(entity):
       try:
         shape = self.create_geometry(entity)
@@ -924,8 +907,8 @@ class IfcConverter:
     if not OpenFoamCase.is_supported_solver(solver):
       raise ValueError('지원하지 않는 solver입니다: {}'.format(solver))
 
-    extract_external_zone = opt[
-        'external_zone_size'] and opt['external_zone_size'] > 1
+    extract_external_zone = (opt['external_zone_size'] and
+                             opt['external_zone_size'] > 1)
 
     working_dir = os.path.normpath(os.path.join(save_dir, case_name))
     if not os.path.exists(working_dir):
@@ -946,7 +929,11 @@ class IfcConverter:
     is_simplified = simplified['info']['simplification']['is_simplified']
 
     if extract_external_zone:
-      shape = simplified['simplified'] if is_simplified else simplified['shape']
+      if is_simplified:
+        shape = simplified['simplified']
+      else:
+        shape = simplified['shape']
+
       zone, zone_faces = make_external_zone(
           shape, buffer_size=opt['external_zone_size'])
 
@@ -963,8 +950,13 @@ class IfcConverter:
                 extract_opening_volume=self.extract_opening_volume)
 
     # geometry 폴더에 저장된 obj 파일을 OpenFOAM 케이스 폴더 가장 바깥에 복사
-    geom_file = 'geometry_external.obj' if extract_external_zone else 'geometry.obj'
+    if extract_external_zone:
+      geom_file = 'geometry_external.obj'
+    else:
+      geom_file = 'geometry.obj'
+
     geom_path = os.path.join(working_dir, 'geometry', geom_file)
+
     if os.path.exists(geom_path):
       copy2(src=geom_path, dst=os.path.join(working_dir, 'geometry.obj'))
     else:
@@ -1021,6 +1013,7 @@ class IfcConverter:
       geom_info = simplified['info'][
           'fused_geometry' if is_simplified else 'original_geometry']
       max_cell_size = geom_info['characteristic_length'] / opt['grid_resolution']
+
     mesh_dict = self.openfoam_cf_mesh_dict(
         max_cell_size=max_cell_size,
         min_cell_size=opt.get('min_cell_size', None),
@@ -1030,7 +1023,7 @@ class IfcConverter:
 
     open_foam_case.save(overwrite=False, minimum=False)
     open_foam_case.save_shell()
-    # todo: decomposeParDict 설정
+    # TODO: decomposeParDict 설정
     return
 
   def component_code(self, entities, prefix, storey_prefix='F'):
@@ -1098,9 +1091,9 @@ def write_each_shapes(shape: TopoDS_Compound, save_dir):
   Parameters
   ----------
   shape : TopoDS_Compound
-      [description]
+      대상 compound
   save_dir : [type]
-      [description]
+      저장 위치
   """
   exp = TopologyExplorer(shape)
   if exp.number_of_solids() <= 1:

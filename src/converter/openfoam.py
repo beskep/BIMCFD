@@ -24,18 +24,24 @@ _DEFAULT_HEADER = \
 Header.set_header(_DEFAULT_HEADER)
 
 _FILE_DIR = os.path.dirname(__file__)
-_SOLVERS = ('simpleFoam', 'buoyantSimpleFoam', 'buoyantBousinessqSimpleFoam')
-_SOLVERS_ENERGY = ('buoyantSimpleFoam', 'buoyantBousinessqSimpleFoam')
+_SOLVERS = (
+    'simpleFoam',
+    'buoyantSimpleFoam',
+    'buoyantBousinessqSimpleFoam',
+)
+_SOLVERS_ENERGY = (
+    'buoyantSimpleFoam',
+    'buoyantBousinessqSimpleFoam',
+)
 _SOLVERS_CONDUCTIVITY = ('buoyantSimpleFoam',)
-_SOLVERS_TURBULENCE = ('simpleFoam', 'buoyantSimpleFoam',
-                       'buoyantBousinessqSimpleFoam')
-# _SOLVER_PATH = {
-#     x.lower(): os.path.normpath(os.path.join(_FILE_DIR, '../template', x))
-#     for x in _SOLVERS
-# }
-# assert all([os.path.exists(x) for x in _SOLVER_PATH.values()])
+_SOLVERS_TURBULENCE = (
+    'simpleFoam',
+    'buoyantSimpleFoam',
+    'buoyantBousinessqSimpleFoam',
+)
 _SOLVER_PATH = {x.lower(): TEMPLATE_DIR.joinpath(x) for x in _SOLVERS}
-assert all(x.exists() for x in _SOLVER_PATH.values())
+for x in _SOLVER_PATH.values():
+  assert x.exists(), x
 
 
 def supported_solvers() -> Tuple[str]:
@@ -99,19 +105,23 @@ class BoundaryFieldDict(OrderedDict):
   def add_value(self, key: str, value):
     if self._width is not None:
       key = key.ljust(self._width)
+
     self[key] = value
 
   def add_comment(self, comment: str):
     if not comment.startswith('//'):
       comment = '// ' + comment
+
     self[comment] = ' '
 
   def add_empty_line(self):
     if self.__key in self:
       while True:
         self.__key += ' '
+
         if self.__key not in self:
           break
+
     self[self.__key] = ' '
     self.__key += ' '
 
@@ -129,6 +139,7 @@ class OpenFoamCase(ButterflyCase):
                geometries: list = None):
     if foamfiles is None:
       foamfiles = []
+
     if geometries is None:
       geometries = []
 
@@ -202,9 +213,12 @@ class OpenFoamCase(ButterflyCase):
         try:
           foam_file = cls._Case__create_foamfile_from_file(
               p, 1.0 / convert_from_meters)
+
           if foam_file:
             ff.append(foam_file)
+
           print('Imported {} from case.'.format(p))
+
         except Exception as e:
           print('Failed to import {}:\n\t{}'.format(p, e))
 
@@ -214,6 +228,7 @@ class OpenFoamCase(ButterflyCase):
       s_hmd.project_name = name
 
       stlfiles = tuple(f for f in _files.stl if f.lower().endswith('.stl'))
+
       bf_geometries = tuple(
           geo for f in stlfiles
           for geo in bf_geometry_from_stl_file(f, convert_from_meters)
@@ -293,11 +308,13 @@ class OpenFoamCase(ButterflyCase):
 
     for f in self.SUBFOLDERS:
       p = os.path.join(self.project_dir, f)
+
       if not os.path.exists(p):
         try:
           os.makedirs(p)
         except Exception as e:
           msg = 'Failed to create foam file {}\n\t{}'.format(p, e)
+
           if str(e).startswith('[Error 183]'):
             warn(msg)
           else:
@@ -311,7 +328,7 @@ class OpenFoamCase(ButterflyCase):
       foam_files = self.foam_files
 
     for f in foam_files:
-      if self.original_dir and f.location != '"0"' and f.name != 'meshDict':
+      if self.original_dir and (f.location != '"0"') and (f.name != 'meshDict'):
         sub_folder = f.location.replace('"', '')
         file_name = f.name
 
@@ -325,7 +342,7 @@ class OpenFoamCase(ButterflyCase):
         path_to = os.path.join(self.project_dir, sub_folder, file_name)
         copy2(path_from, path_to)
       else:
-        # todo: foam file 저장 함수 새로 만들기
+        # TODO: foam file 저장 함수 새로 만들기
         f.save(self.project_dir)
 
     # add .foam file
@@ -337,6 +354,7 @@ class OpenFoamCase(ButterflyCase):
 
   def save_shell(self):
     mesh = os.path.join(self.project_dir, 'mesh.sh')
+
     with open(mesh, 'w') as f:
       f.write('''surfaceFeatureEdges -angle 0 geometry.obj geometry.fms
       cartesianMesh
