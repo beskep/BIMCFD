@@ -49,6 +49,7 @@ class DropDownMenu(MDBoxLayout):
     super(DropDownMenu, self).__init__(*args, **kwargs)
 
     self._button = MDDropDownItem()
+    self._button.size_hint_x = 1
     self._menu: MDDropdownMenu = None
     self._text_width = None
     self._selected_item = None
@@ -91,6 +92,7 @@ class DropDownMenu(MDBoxLayout):
 
   def set_items(self, text: list, right_text=None, icon=None, right_icon=None):
     # TODO: 첫 번째 right_text가 None으로 설정되는 문제 해결
+    # TODO: 'icon' 설정 안되는 문제 해결
     if right_text is None or isinstance(right_text, str):
       right_text = itertools.repeat(right_text, len(text))
 
@@ -154,12 +156,15 @@ if __name__ == "__main__":
 MDBoxLayout:
     MDRaisedButton:
         text: "1"
+        size_hint: (1, 1)
     DropDownMenu:
         id: test
-        # text: "PRESS ME"
+        text: "PRESS ME"
         pos_hint: {"center_x": .5, "center_y": .5}
+        size_hint: (1, 1)
     MDRaisedButton:
         text: "2"
+        size_hint: (1, 1)
 '''
 
   class Tester(MDApp):

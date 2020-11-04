@@ -696,7 +696,7 @@ class IfcConverter:
       self._spaces_walls = self.get_space_wall_dict()
 
     boundaries = set(chain.from_iterable([get_bounded_by(x) for x in targets]))
-    walls = [x for x in boundaries if x.is_a('IfcWall')]
+    walls = [x for x in boundaries if x is not None and x.is_a('IfcWall')]
     openings = list(
         set(chain.from_iterable([self.get_openings(w) for w in walls])))
 

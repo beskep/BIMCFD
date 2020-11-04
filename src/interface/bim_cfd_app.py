@@ -27,8 +27,19 @@ from interface.widgets.panel_title import PanelTitle
 from interface.widgets.text_field import TextFieldPath, TextFieldUnit
 
 _FONT_STYLES = [
-    'H1', 'H2', 'H3', 'H4', 'H5', 'H6', 'Subtitle1', 'Subtitle2', 'Body1',
-    'Body2', 'Button', 'Caption', 'Overline'
+    'H1',
+    'H2',
+    'H3',
+    'H4',
+    'H5',
+    'H6',
+    'Subtitle1',
+    'Subtitle2',
+    'Body1',
+    'Body2',
+    'Button',
+    'Caption',
+    'Overline',
 ]
 
 
@@ -64,8 +75,7 @@ class BimCfdApp(UtfMDApp):
     self._space_menu: DropDownMenu = None
     self._solver_menu: DropDownMenu = None
 
-    self._vis_layout: MDBoxLayout = None  # TODO: 삭제
-    self._vis: topo.TopoRenderer = None
+    self._vis_layout: MDBoxLayout = None
     self._spinner: MDSpinner = None
     self._geom_table_layout: MDBoxLayout = None
     self._material_table_layout: MDBoxLayout = None
@@ -124,12 +134,6 @@ class BimCfdApp(UtfMDApp):
     if self._vis_layout is None:
       self._vis_layout = self.root.ids.view_panel.ids.vis_layout
     return self._vis_layout
-
-  @property
-  def vis(self):
-    if self._vis is None:
-      self._vis = self.root.ids.view_panel.ids.vis
-    return self._vis
 
   @property
   def geom_table_layout(self):
@@ -231,33 +235,53 @@ class BimCfdApp(UtfMDApp):
     else:
       self._logger.error('IFC가 업데이트 되지 않음.')
 
-  def select_and_visualize_space(self):
-    if self.spaces_menu.select_item is None:
+  def selected_space_entity(self):
+    if self.spaces_menu.selected_item is None:
       self.show_snackbar('공간을 선택해주세요')
+      space_entity = None
     else:
       selected_text = self.spaces_menu.selected_item_text()
-      assert '.' in selected_text != -1
+      assert '.' in selected_text
+
       space_idx = selected_text[:selected_text.find('.')][6:]
       space_entity = self._spaces[int(space_idx) - 1]
-      _, space, _, openings = self._converter.convert_space(space_entity)
 
-      space_mesh = topo.TopoDsMesh(shapes=[space],
-                                   linear_deflection=self._vis_deflection[0],
-                                   angular_deflection=self._vis_deflection[1],
-                                   color=(1.0, 1.0, 1.0, 0.5))
-      mesh = [space_mesh]
-      if openings:
-        openings_mesh = topo.TopoDsMesh(
-            shapes=openings,
-            linear_deflection=self._vis_deflection[0],
-            angular_deflection=self._vis_deflection[1],
-            color=(0.216, 0.494, 0.722, 0.5))
-        mesh.append(openings_mesh)
+    return space_entity
 
-      self.vis_layout.clear_widgets()
-      self.vis_layout.add_widget(topo.TopoRenderer(shapes=mesh))
+  def visualize_topology(self, spaces, openings):
+    space_mesh = topo.TopoDsMesh(shapes=spaces,
+                                 linear_deflection=self._vis_deflection[0],
+                                 angular_deflection=self._vis_deflection[1],
+                                 color=(1.0, 1.0, 1.0, 0.5))
+    mesh = [space_mesh]
+
+    if openings:
+      openings_mesh = topo.TopoDsMesh(
+          shapes=openings,
+          linear_deflection=self._vis_deflection[0],
+          angular_deflection=self._vis_deflection[1],
+          color=(0.216, 0.494, 0.722, 0.5))
+      mesh.append(openings_mesh)
+
+    self.vis_layout.clear_widgets()
+    self.vis_layout.add_widget(topo.TopoRenderer(shapes=mesh))
+
+  def visualize_selected_space(self):
+    space_entity = self.selected_space_entity()
+    if space_entity is None:
+      return
+
+    _, space, _, openings = self._converter.convert_space(space_entity)
+    self.visualize_topology(spaces=[space], openings=openings)
 
   def check_simplify(self, state):
+    """단순화 여부에 따라 형상 단순화 옵션 활성화/비활성화
+
+    Parameters
+    ----------
+    state : str
+        단순화 여부 선택 버튼의 state ({'down', 'normal'})
+    """
     options = ['dist_threshold', 'vol_threshold', 'angle_threshold']
     simplification_ids = self.root.ids.simplification_panel.ids
 
@@ -273,6 +297,13 @@ class BimCfdApp(UtfMDApp):
         self._logger.error(msg)
 
   def check_relative_threshold(self, state):
+    """단순화에 상대적 기준 설정 여부에 따라 필드의 단위 표시/비표시
+
+    Parameters
+    ----------
+    state : str
+        상대적 기준 적용 버튼의 state ({'down', 'normal'})
+    """
     options = ['dist_threshold', 'vol_threshold', 'angle_threshold']
     simplification_ids = self.root.ids.simplification_panel.ids
 
@@ -289,8 +320,10 @@ class BimCfdApp(UtfMDApp):
 
   def show_snackbar(self, message, duration=None):
     self._snackbar.text = message
+
     if duration:
       self._snackbar.duration = duration
+
     self._snackbar.show()
 
   def activate_spinner(self, active=True):

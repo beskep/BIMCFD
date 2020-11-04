@@ -44,19 +44,21 @@
                     # MDRectangleFlatIconButton:
                         text: '폴더 선택'
                         # icon: 'content-save-edit'
-                        width: dp(20)
                         on_release: app.open_file_manager('save')
                 
                 MDBoxLayout:
+                    orientation: 'horizontal'
+                    spacing: dp(5)
+
                     MDLabel:
                         text: '대상 공간'
-                        size_hint_x: 1
+                        size_hint_x: None
+                        width: dp(80)
                     DropDownMenu:
                         id: space
                         text: '선택'
-                        text_width: 50
-                        size_hint_x: 2
+                        # text_width: 20
+                        # size_hint_x: 1
                     MDRaisedButton:
                         text: '시각화'
-                        size_hint_x: 1
-                        on_release: app.select_and_visualize_space()
+                        on_release: app.visualize_selected_space()
