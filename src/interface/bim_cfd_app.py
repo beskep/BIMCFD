@@ -47,10 +47,10 @@ class BimCfdWidget(MDBoxLayout):
   pass
 
 
-class BimCfdApp(UtfMDApp):
+class BimCfdAppBase(UtfMDApp):
 
   def __init__(self, **kwargs):
-    super(BimCfdApp, self).__init__(**kwargs)
+    super(BimCfdAppBase, self).__init__(**kwargs)
 
     self._logger = logging.getLogger(self.__class__.__name__)
 
@@ -82,13 +82,6 @@ class BimCfdApp(UtfMDApp):
 
     self._snackbar = Snackbar()
     self._snackbar.duration = 2
-
-    # IFC Converter setting
-    self._converter: ifccnv.IfcConverter = None
-    # TODO: 정밀도 설정 converter에 전달
-    self._spaces: list = None
-    self._target_space_id = None
-    self._vis_deflection = (0.1, 0.5)
 
   def build(self):
     return BimCfdWidget()
@@ -207,6 +200,73 @@ class BimCfdApp(UtfMDApp):
 
     self.bim_path_field.focus = True
 
+  def check_simplify(self, state):
+    """단순화 여부에 따라 형상 단순화 옵션 활성화/비활성화
+
+    Parameters
+    ----------
+    state : str
+        단순화 여부 선택 버튼의 state ({'down', 'normal'})
+    """
+    options = ['dist_threshold', 'vol_threshold', 'angle_threshold']
+    simplification_ids = self.root.ids.simplification_panel.ids
+
+    for option in options:
+      field: TextFieldUnit = simplification_ids[option]
+
+      if state == 'down':
+        field.activate()
+      elif state == 'normal':
+        field.deactivate()
+      else:
+        msg = 'Unexpected button state: {}'.format(state)
+        self._logger.error(msg)
+
+  def check_relative_threshold(self, state):
+    """단순화에 상대적 기준 설정 여부에 따라 필드의 단위 표시/비표시
+
+    Parameters
+    ----------
+    state : str
+        상대적 기준 적용 버튼의 state ({'down', 'normal'})
+    """
+    options = ['dist_threshold', 'vol_threshold', 'angle_threshold']
+    simplification_ids = self.root.ids.simplification_panel.ids
+
+    for option in options:
+      field: TextFieldUnit = simplification_ids[option]
+
+      if state == 'down':
+        field.deactivate_unit()
+      elif state == 'normal':
+        field.activate_unit()
+      else:
+        msg = 'Unexpected button state: {}'.format(state)
+        self._logger.error(msg)
+
+  def show_snackbar(self, message, duration=None):
+    self._snackbar.text = message
+
+    if duration:
+      self._snackbar.duration = duration
+
+    self._snackbar.show()
+
+  def activate_spinner(self, active=True):
+    self.spinner.active = active
+
+
+class BimCfdApp(BimCfdAppBase):
+
+  def __init__(self, **kwargs):
+    super(BimCfdApp, self).__init__(**kwargs)
+
+    self._converter: ifccnv.IfcConverter = None
+    # TODO: 정밀도 설정 converter에 전달
+    self._spaces: list = None
+    self._target_space_id = None
+    self._vis_deflection = (0.1, 0.5)
+
   def load_ifc(self, path: Path):
     try:
       self._converter = ifccnv.IfcConverter(path=path.as_posix())
@@ -274,60 +334,13 @@ class BimCfdApp(UtfMDApp):
     _, space, _, openings = self._converter.convert_space(space_entity)
     self.visualize_topology(spaces=[space], openings=openings)
 
-  def check_simplify(self, state):
-    """단순화 여부에 따라 형상 단순화 옵션 활성화/비활성화
+  def add_geom_table(self, column_data, row_data):
+    data_table = MDDataTable(column_data=column_data, row_data=row_data)
+    self.geom_table_layout.add_widget(data_table)
 
-    Parameters
-    ----------
-    state : str
-        단순화 여부 선택 버튼의 state ({'down', 'normal'})
-    """
-    options = ['dist_threshold', 'vol_threshold', 'angle_threshold']
-    simplification_ids = self.root.ids.simplification_panel.ids
-
-    for option in options:
-      field: TextFieldUnit = simplification_ids[option]
-
-      if state == 'down':
-        field.activate()
-      elif state == 'normal':
-        field.deactivate()
-      else:
-        msg = 'Unexpected button state: {}'.format(state)
-        self._logger.error(msg)
-
-  def check_relative_threshold(self, state):
-    """단순화에 상대적 기준 설정 여부에 따라 필드의 단위 표시/비표시
-
-    Parameters
-    ----------
-    state : str
-        상대적 기준 적용 버튼의 state ({'down', 'normal'})
-    """
-    options = ['dist_threshold', 'vol_threshold', 'angle_threshold']
-    simplification_ids = self.root.ids.simplification_panel.ids
-
-    for option in options:
-      field: TextFieldUnit = simplification_ids[option]
-
-      if state == 'down':
-        field.deactivate_unit()
-      elif state == 'normal':
-        field.activate_unit()
-      else:
-        msg = 'Unexpected button state: {}'.format(state)
-        self._logger.error(msg)
-
-  def show_snackbar(self, message, duration=None):
-    self._snackbar.text = message
-
-    if duration:
-      self._snackbar.duration = duration
-
-    self._snackbar.show()
-
-  def activate_spinner(self, active=True):
-    self.spinner.active = active
+  def add_material_table(self, column_data, row_data):
+    data_table = MDDataTable(column_data=column_data, row_data=row_data)
+    self.material_table_layout.add_widget(data_table)
 
   def test_add_tables(self):
     self.add_geom_table(
@@ -339,20 +352,6 @@ class BimCfdApp(UtfMDApp):
                      ('매칭 결과', dp(30))],
         row_data=[('a', 'b', 'c'), (1, 2, 3), (4, 5, 6), ('A', 'B', 'C')],
     )
-
-  def add_geom_table(self, column_data, row_data):
-    """test용
-    """
-
-    data_table = MDDataTable(column_data=column_data, row_data=row_data)
-    self.geom_table_layout.add_widget(data_table)
-
-  def add_material_table(self, column_data, row_data):
-    """test용
-    """
-
-    data_table = MDDataTable(column_data=column_data, row_data=row_data)
-    self.material_table_layout.add_widget(data_table)
 
 
 if __name__ == "__main__":
