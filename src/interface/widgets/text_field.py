@@ -69,6 +69,10 @@ class TextFieldUnit(MDBoxLayout):
     self.add_widget(self._main_text)
     self.add_widget(self._unit_text)
 
+  @property
+  def main_text(self):
+    return self._main_text.text
+
   def on_text(self, instance, value):
     self._main_text.text = value
 

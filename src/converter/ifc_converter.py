@@ -52,7 +52,7 @@ class IfcConverter:
     self._ifc_types_wall = wall_types
     self._ifc_types_slab = slab_types
     self._ifc_types_covering = covering_types
-    self._spaces_walls = None
+    self._spaces_walls = None  # TODO: 삭제
     self._storeys = None
 
     self._brep_deflection = (0.9, 0.5)
@@ -676,8 +676,9 @@ class IfcConverter:
       if isinstance(targets[idx], int):
         targets[idx] = self.ifc.by_id(int(targets[idx]))
 
-    if self._spaces_walls is None:
-      self._spaces_walls = self.get_space_wall_dict()
+    # TODO: 삭제
+    # if self._spaces_walls is None:
+    #   self._spaces_walls = self.get_space_wall_dict()
 
     boundaries = set(chain.from_iterable([get_bounded_by(x) for x in targets]))
     walls = [x for x in boundaries if x is not None and x.is_a('IfcWall')]

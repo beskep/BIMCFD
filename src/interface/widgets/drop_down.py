@@ -5,7 +5,8 @@ from kivy.properties import NumericProperty, StringProperty
 from kivymd.uix.boxlayout import MDBoxLayout
 from kivymd.uix.dropdownitem import MDDropDownItem
 from kivymd.uix.menu import MDDropdownMenu, RightContent
-from kivymd.uix.textfield import MDTextField
+from kivymd.uix.label import MDLabel
+from kivy.uix.label import Label
 
 
 class RightContentCls(RightContent):
@@ -43,13 +44,14 @@ class DropDownMenu(MDBoxLayout):
   text_width = NumericProperty(0)
   font_name = StringProperty('')
 
-  # TODO: 초기 theme_text_color, 설정 후 색 변경
-
   def __init__(self, *args, **kwargs):
     super(DropDownMenu, self).__init__(*args, **kwargs)
 
     self._button = MDDropDownItem()
     self._button.size_hint_x = 1
+    self._button_label: Label = self._button.ids.label_item
+    self._button_label.markup = True
+
     self._menu: MDDropdownMenu = None
     self._text_width = None
     self._selected_item = None
@@ -171,8 +173,6 @@ MDBoxLayout:
 
     def build(self):
       # widget = DropDownMenu()
-      # widget.items = [{"text": f"Item {i}"} for i in range(5)]
-
       widget = Builder.load_string(kv)
       ddm: DropDownMenu = widget.ids.test
       # widget.ids.test.items = [{"text": f"Item {i}"} for i in range(5)]

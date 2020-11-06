@@ -1,21 +1,15 @@
 import os
 
 from kivy.app import App
-from kivy.lang.builder import Builder
 from kivymd.app import MDApp
-
-
-def load_kv(path, encoding='UTF-8'):
-  if not os.path.exists(path):
-    raise FileNotFoundError(path)
-
-  with open(path, 'r', encoding=encoding) as f:
-    kv = Builder.load_string(f.read())
-
-  return kv
+from interface.kvtools import load_kv
 
 
 class UtfApp(App):
+  """
+  쓸모 없음
+  app 이름과 같은 kv 파일 이름만 피하면 됨
+  """
 
   def run(self, kv_path=None, encoding='UTF-8'):
     if kv_path is not None:
@@ -29,6 +23,10 @@ class UtfApp(App):
 
 
 class UtfMDApp(MDApp):
+  """
+  쓸모 없음
+  app 이름과 같은 kv 파일 이름만 피하면 됨
+  """
 
   def run(self, kv_path=None, encoding='UTF-8'):
     if kv_path is not None:

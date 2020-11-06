@@ -1,7 +1,7 @@
 import os
 from collections import namedtuple, OrderedDict
 from shutil import rmtree, copy2
-from typing import Tuple
+from typing import Tuple, List
 from warnings import warn
 
 from butterfly.case import Case as ButterflyCase
@@ -44,8 +44,21 @@ for x in _SOLVER_PATH.values():
   assert x.exists(), x
 
 
-def supported_solvers() -> Tuple[str]:
-  return _SOLVERS[:]
+def supported_solvers(energy=False,
+                      conductivity=False,
+                      turbulence=False) -> List[str]:
+  solvers = set(_SOLVERS)
+
+  if energy:
+    solvers = solvers.intersection(set(_SOLVERS_ENERGY))
+  if conductivity:
+    solvers = solvers.intersection(set(_SOLVERS_CONDUCTIVITY))
+  if turbulence:
+    solvers = solvers.intersection(set(_SOLVERS_TURBULENCE))
+
+  solvers = sorted(list(solvers))
+
+  return solvers
 
 
 def list_files(folder, fullpath=False):
