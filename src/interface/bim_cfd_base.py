@@ -1,4 +1,5 @@
 import logging
+import threading
 from pathlib import Path
 
 from kivy.clock import mainthread
@@ -33,6 +34,29 @@ _FONT_STYLES = [
 ]
 
 
+def with_spinner(fn):
+  """BimCfdApp의 method 실행 중 spinner 애니메이션을 보여줌
+
+  Parameters
+  ----------
+  fn : function
+  """
+
+  def fn_and_deactivate(self, *args, **kwargs):
+    fn(self, *args, **kwargs)
+    self.activate_spinner(False)
+
+  def wrapper(self, *args, **kwargs):
+    self.activate_spinner(True)
+    th = threading.Thread(target=fn_and_deactivate,
+                          args=((self,) + args),
+                          kwargs=kwargs)
+    th.start()
+    # th.join()
+
+  return wrapper
+
+
 class BimCfdWidget(MDBoxLayout):
   pass
 
@@ -65,14 +89,14 @@ class BimCfdAppBase(MDApp):
     self._space_menu: DropDownMenu = None
     self._solver_menu: DropDownMenu = None
 
-    self._vis_layout: MDBoxLayout = None
     self._spinner: MDSpinner = None
+    self._vis_layout: MDBoxLayout = None
     self._geom_table_layout: MDBoxLayout = None
     self._material_table_layout: MDBoxLayout = None
 
     self._snackbar = Snackbar()
-    self._snackbar.snackbar_x = dp(10)
-    self._snackbar.snackbar_y = dp(10)
+    # self._snackbar.snackbar_x = dp(10)
+    # self._snackbar.snackbar_y = dp(10)
     self._snackbar.duration = 2
 
   def build(self):
@@ -97,55 +121,58 @@ class BimCfdAppBase(MDApp):
     self.built = True
 
   @property
-  def bim_path_field(self):
+  def bim_path_field(self) -> TextFieldPath:
     if self._bim_path_field is None:
       self._bim_path_field = self.root.ids.file_panel.ids.bim_path
     return self._bim_path_field
 
   @property
-  def save_dir_field(self):
+  def save_dir_field(self) -> TextFieldPath:
     if self._save_dir_field is None:
       self._save_dir_field = self.root.ids.file_panel.ids.save_dir
     return self._save_dir_field
 
   @property
-  def spaces_menu(self):
+  def spaces_menu(self) -> DropDownMenu:
     if self._space_menu is None:
       self._space_menu = self.root.ids.file_panel.ids.space
     return self._space_menu
 
   @property
-  def solver_menu(self):
+  def solver_menu(self) -> DropDownMenu:
     if self._solver_menu is None:
       self._solver_menu = self.root.ids.cfd_panel.ids.solver
     return self._solver_menu
 
   @property
-  def spinner(self):
+  def spinner(self) -> MDSpinner:
     if self._spinner is None:
       spinner_layout: Widget = self.root.ids.view_panel.ids.spinner_layout
+
       spinner = MDSpinner()
       spinner.size_hint = (None, None)
-      spinner.size = (dp(50), dp(50))
+      spinner.size = (dp(100), dp(100))
       spinner.active = False
       spinner_layout.add_widget(spinner)
+
       self._spinner = spinner
+
     return self._spinner
 
   @property
-  def vis_layout(self):
+  def vis_layout(self) -> MDBoxLayout:
     if self._vis_layout is None:
       self._vis_layout = self.root.ids.view_panel.ids.vis_layout
     return self._vis_layout
 
   @property
-  def geom_table_layout(self):
+  def geom_table_layout(self) -> MDBoxLayout:
     if self._geom_table_layout is None:
       self._geom_table_layout = self.root.ids.view_panel.ids.geom_table
     return self._geom_table_layout
 
   @property
-  def material_table_layout(self):
+  def material_table_layout(self) -> MDBoxLayout:
     if self._material_table_layout is None:
       self._material_table_layout = self.root.ids.view_panel.ids.material_table
     return self._material_table_layout
@@ -308,8 +335,12 @@ class BimCfdAppBase(MDApp):
 
   def add_geom_table(self, column_data, row_data):
     data_table = MDDataTable(column_data=column_data, row_data=row_data)
+    data_table.pos_hint = {'center_x': 0.5, 'center_x': 0.5}
+
     self.geom_table_layout.add_widget(data_table)
 
   def add_material_table(self, column_data, row_data):
     data_table = MDDataTable(column_data=column_data, row_data=row_data)
+    data_table.pos_hint = {'center_x': 0.5, 'center_x': 0.5}
+
     self.material_table_layout.add_widget(data_table)

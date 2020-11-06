@@ -1,6 +1,7 @@
 import sys
-import threading
 from pathlib import Path
+
+from kivy.metrics import dp
 
 _SRC_DIR = Path(__file__).parents[1]
 if str(_SRC_DIR) not in sys.path:
@@ -11,7 +12,7 @@ from converter import ifc_converter as ifccnv
 from converter import openfoam
 
 from interface import kvtools
-from interface.bim_cfd_base import BimCfdAppBase
+from interface.bim_cfd_base import BimCfdAppBase, with_spinner
 from interface.widgets import topo_widget as topo
 from interface.widgets.drop_down import DropDownMenu
 from interface.widgets.panel_title import PanelTitle
@@ -27,7 +28,7 @@ class BimCfdApp(BimCfdAppBase):
     self._spaces: list = None
     self._target_space_id = None
 
-    self._simplified_result: dict = None
+    self._simplified: dict = None
 
   def build_and_initialize(self):
     self.manual_build()
@@ -38,15 +39,10 @@ class BimCfdApp(BimCfdAppBase):
     super(BimCfdApp, self).select_path(path)
 
     path = Path(path)
-
     if self.file_manager.mode == 'bim' and path.suffix.lower() == '.ifc':
-      self.activate_spinner(True)
-
       self.load_ifc(path)
-      self.update_ifc_spaces()
 
-      self.activate_spinner(False)
-
+  @with_spinner
   def load_ifc(self, path: Path):
     try:
       self._converter = ifccnv.IfcConverter(path=path.as_posix())
@@ -56,6 +52,7 @@ class BimCfdApp(BimCfdAppBase):
 
     options = self.get_simplification_options()
     self._converter.brep_deflection = options['precision']
+    self.update_ifc_spaces()
 
   def update_ifc_spaces(self):
     if self._converter is not None:
@@ -92,7 +89,7 @@ class BimCfdApp(BimCfdAppBase):
 
     return space_entity
 
-  def visualize_topology(self, spaces, openings):
+  def visualize_topology(self, spaces, openings=None):
     space_mesh = topo.TopoDsMesh(
         shapes=spaces,
         linear_deflection=self._converter.brep_deflection[0],
@@ -119,10 +116,20 @@ class BimCfdApp(BimCfdAppBase):
     _, space, _, openings = self._converter.convert_space(space_entity)
     self.visualize_topology(spaces=[space], openings=openings)
 
-  def execute_helper(self):
+  @with_spinner
+  def simplify_space(self):
     space = self.selected_space_entity()
+    if space is None:
+      return
+
     options = self.get_simplification_options()
-    options['angle_threshold'] *= (3.141592 / 180)
+    if options['simplify']:
+      # degree to rad
+      options['angle_threshold'] *= (3.141592 / 180)
+    else:
+      options['dist_threshold'] = 0.0
+      options['vol_threshold'] = 0.0
+      options['angle_threshold'] = 0.0
 
     simplified = self._converter.simplify_space(
         spaces=space,
@@ -134,25 +141,38 @@ class BimCfdApp(BimCfdAppBase):
         relative_threshold=options['relative_threshold'],
         preserve_opening=options['preserve_openings'],
         opening_volume=options['opening_volume'])
+    assert simplified is not None
 
-    self.activate_spinner(False)
+    self._simplified = simplified
 
   def execute(self):
-    space = self.selected_space_entity()
-    if space is None:
+    simplified = self._simplified
+    if not simplified:
+      self.show_snackbar('형상 전처리 필요')
       return
 
-    self.activate_spinner(True)
+    geom_cols = [('변수', dp(50)), ('전처리 전', dp(100)), ('전처리 후', dp(100))]
+    geom_orig: dict = simplified['info']['original_geometry']
+    geom_simp: dict = simplified['info']['simplified_geometry']
 
-    thread = threading.Thread(target=self.execute_helper)
-    thread.start()
-    # thread.join()
+    if geom_simp is None:
+      geom_simp = dict()
+
+    geom_vars = list(geom_orig.keys())
+    geom_rows = [(x, geom_orig[x], geom_simp.get(x, 'NA')) for x in geom_vars]
+    self.add_geom_table(column_data=geom_cols, row_data=geom_rows)
+
+    geom = simplified['simplified']
+    if geom is None:
+      geom = simplified['shape']
+
+    self.visualize_topology(spaces=[geom])
 
     return
 
   def test_add_tables(self):
     self.add_geom_table(
-        column_data=[('변수', dp(30)), ('단순화 전', dp(30)), ('단순화 후', dp(30))],
+        column_data=[('변수', dp(30)), ('전처리 전', dp(30)), ('전처리 후', dp(30))],
         row_data=[('부피', 1, 2), ('표면적', 3, 4), ('특성길이', 5, 6)],
     )
     self.add_material_table(
@@ -189,8 +209,8 @@ if __name__ == "__main__":
   # test
   # app.file_manager.mode = 'bim'
   # app.exit_file_manager = lambda: print()
-  # app.select_path(
-  #     r'D:\repo\IFC\National Institute of Building Sciences\Project 3. Medical Clinic\2011-09-14-Clinic-IFC\Clinic_A_20110906_optimized.ifc'
-  # )
+  # app.select_path((r'D:\repo\IFC\National Institute of Building Sciences'
+  #                  r'\Project 3. Medical Clinic\2011-09-14-Clinic-IFC'
+  #                  r'\Clinic_A_20110906_optimized.ifc'))
 
   app.run()
