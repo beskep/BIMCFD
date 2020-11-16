@@ -3,6 +3,7 @@
 <ViewPanel@MDBoxLayout>:
     BIMCFDPanel:
         MDBottomNavigation:
+            id: navigation
             MDBottomNavigationItem:
                 name: 'visualization'
                 text: '시각화'
@@ -10,18 +11,11 @@
                 FloatLayout:
                     MDBoxLayout:
                         id: vis_layout
-                        # TopoRenderer:
-                        #     id: vis
                     AnchorLayout:
                         anchor_x: 'right'
                         anchor_y: 'bottom'
                         padding: dp(10)
                         id: spinner_layout
-                        # MDSpinner:
-                        #     id: spinner
-                        #     size_hint: None, None
-                        #     size: dp(50), dp(50)
-                        #     active: False
             MDBottomNavigationItem:
                 name: 'geom_stat'
                 text: '형상 정보'

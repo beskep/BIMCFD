@@ -25,17 +25,19 @@
                 DropDownMenu:
                     id: solver
                     text: 'buoyantSimpleFoam'
-                    text_width: 50
                     size_hint_x: 3
+                    width_mult: 7
                 
             MDBoxLayout:
                 spacing: dp(10)
         
                 MDRaisedButton:
                     text: 'CFD 해석 설정'
-                    # on_release: app.activate_spinner(False)
+                    on_release: app.cfd_dialog.open()
             
                 MDRaisedButton:
+                    id: execute
                     text: '변환'
                     size_hint_x: 1
+                    disabled: True
                     on_release: app.execute()

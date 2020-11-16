@@ -2,6 +2,7 @@ import sys
 from pathlib import Path
 
 from kivy.metrics import dp
+from kivy.clock import mainthread
 
 _SRC_DIR = Path(__file__).parents[1]
 if str(_SRC_DIR) not in sys.path:
@@ -42,7 +43,7 @@ class BimCfdApp(BimCfdAppBase):
     if self.file_manager.mode == 'bim' and path.suffix.lower() == '.ifc':
       self.load_ifc(path)
 
-  @with_spinner
+  # @with_spinner
   def load_ifc(self, path: Path):
     try:
       self._converter = ifccnv.IfcConverter(path=path.as_posix())
@@ -51,8 +52,9 @@ class BimCfdApp(BimCfdAppBase):
       self.show_snackbar('IFC 로드 실패')
 
     options = self.get_simplification_options()
-    self._converter.brep_deflection = options['precision']
-    self.update_ifc_spaces()
+    if options is not None:
+      self._converter.brep_deflection = options['precision']
+      self.update_ifc_spaces()
 
   def update_ifc_spaces(self):
     if self._converter is not None:
@@ -68,7 +70,7 @@ class BimCfdApp(BimCfdAppBase):
       self.spaces_menu.set_items(
           text=names,
           right_text=ids,
-          icon='identifier',
+          icon='folder-outline',
           # icon='floor-plan',  # TODO: Material Icon Font 업데이트
           right_icon='identifier')
 
@@ -81,6 +83,7 @@ class BimCfdApp(BimCfdAppBase):
       self.show_snackbar('공간을 선택해주세요')
       space_entity = None
     else:
+      # TODO: string으로부터 id 추출...
       selected_text = self.spaces_menu.selected_item_text()
       assert '.' in selected_text
 
@@ -89,6 +92,7 @@ class BimCfdApp(BimCfdAppBase):
 
     return space_entity
 
+  @mainthread
   def visualize_topology(self, spaces, openings=None):
     space_mesh = topo.TopoDsMesh(
         shapes=spaces,
@@ -123,7 +127,10 @@ class BimCfdApp(BimCfdAppBase):
       return
 
     options = self.get_simplification_options()
-    if options['simplify']:
+    if options is None:
+      return
+
+    if options['flag_simplify']:
       # degree to rad
       options['angle_threshold'] *= (3.141592 / 180)
     else:
@@ -138,20 +145,26 @@ class BimCfdApp(BimCfdAppBase):
         threshold_volume=options['vol_threshold'],
         threshold_dist=options['dist_threshold'],
         threshold_angle=options['angle_threshold'],
-        relative_threshold=options['relative_threshold'],
-        preserve_opening=options['preserve_openings'],
-        opening_volume=options['opening_volume'])
+        relative_threshold=options['flag_relative_threshold'],
+        preserve_opening=options['flag_preserve_openings'],
+        opening_volume=options['flag_opening_volume'])
     assert simplified is not None
 
     self._simplified = simplified
 
-  def execute(self):
+    self.show_simplification_results()
+    self.execute_button.disabled = False
+    self.show_snackbar('형상 전처리 완료', duration=1)
+
+  @mainthread
+  def show_simplification_results(self):
     simplified = self._simplified
     if not simplified:
       self.show_snackbar('형상 전처리 필요')
       return
 
-    geom_cols = [('변수', dp(50)), ('전처리 전', dp(100)), ('전처리 후', dp(100))]
+    # TODO: 표 다듬기
+    geom_cols = [('변수', dp(50)), ('전처리 전', dp(50)), ('전처리 후', dp(50))]
     geom_orig: dict = simplified['info']['original_geometry']
     geom_simp: dict = simplified['info']['simplified_geometry']
 
@@ -160,6 +173,7 @@ class BimCfdApp(BimCfdAppBase):
 
     geom_vars = list(geom_orig.keys())
     geom_rows = [(x, geom_orig[x], geom_simp.get(x, 'NA')) for x in geom_vars]
+    self.geom_table_layout.clear_widgets()
     self.add_geom_table(column_data=geom_cols, row_data=geom_rows)
 
     geom = simplified['simplified']
@@ -168,7 +182,37 @@ class BimCfdApp(BimCfdAppBase):
 
     self.visualize_topology(spaces=[geom])
 
-    return
+  @with_spinner
+  def _execute_helper(self, simplified, save_dir, openfoam_options):
+    assert simplified is not None
+    self._converter.openfoam_case(simplified=simplified,
+                                  save_dir=save_dir,
+                                  case_name='BIMCFD',
+                                  openfoam_options=openfoam_options)
+
+  def execute(self):
+    if not self.save_dir_field.text:
+      self.show_snackbar('저장 경로를 설정해주세요')
+      return
+
+    save_dir = Path(self.save_dir_field.text).resolve()
+    if not save_dir.exists():
+      self.show_snackbar('저장 경로가 존재하지 않습니다')
+      return
+
+    if self._simplified is None:
+      self.show_snackbar('형상 전처리가 완료되지 않았습니다')
+      return
+
+    # solver = self.solver_menu.selected_item_text()
+    # ofoptions = {'solver': solver}
+    ofoptions = None
+
+    # TODO: internal face 설정 적용
+    # TODO: external zone 설정 적용
+    self._execute_helper(simplified=self._simplified,
+                         save_dir=save_dir,
+                         openfoam_options=ofoptions)
 
   def test_add_tables(self):
     self.add_geom_table(

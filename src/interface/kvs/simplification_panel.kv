@@ -21,30 +21,32 @@
             
                 MDBoxLayout:
                     spacing: dp(10)
+                    # size_hint_x: None
+
                     MDBoxLayout:
                         orientation: 'vertical'
                         size_hint_x: None
                         width: dp(25)
 
                         MDCheckbox:
-                            id: simplify
+                            id: flag_simplify
                             active: False
                             on_state: app.check_simplify(self.state)
                         MDCheckbox:
-                            id: relative_threshold
+                            id: flag_relative_threshold
                             active: True
                             on_state: app.check_relative_threshold(self.state)
                             # disabled: True
                         MDCheckbox:
-                            id: preserve_openings
+                            id: flag_preserve_openings
                             active: True
                             # disabled: True
                         MDCheckbox:
-                            id: opening_volume
+                            id: flag_opening_volume
                             active: True
                             # disabled: True
                         MDCheckbox:
-                            id: internal_faces
+                            id: flag_internal_faces
                         # disabled: True
 
                     MDBoxLayout:
@@ -64,7 +66,7 @@
 
                 MDBoxLayout:
                     orientation: 'vertical'
-                    size_hint_x: 1.0
+                    size_hint_x: 1.2
 
                     TextFieldUnit:
                         id: precision
@@ -91,9 +93,14 @@
                         unit: 'degree'
                         show_unit: True
                     
-                    MDRaisedButton:
-                        text: '형상 전처리'
-                        on_release: app.simplify_space()
+                    AnchorLayout:
+                        anchor_x: 'right'
+                        # size_hint_y: 0.5
+                        MDRaisedButton:
+                            id: simplify
+                            text: '형상 전처리'
+                            disabled: True
+                            on_release: app.simplify_space()
                 
                 MDBoxLayout:
                     size_hint_x: None

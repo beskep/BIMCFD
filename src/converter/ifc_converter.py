@@ -676,10 +676,6 @@ class IfcConverter:
       if isinstance(targets[idx], int):
         targets[idx] = self.ifc.by_id(int(targets[idx]))
 
-    # TODO: 삭제
-    # if self._spaces_walls is None:
-    #   self._spaces_walls = self.get_space_wall_dict()
-
     boundaries = set(chain.from_iterable([get_bounded_by(x) for x in targets]))
     walls = [x for x in boundaries if x is not None and x.is_a('IfcWall')]
     openings = list(
@@ -751,6 +747,7 @@ class IfcConverter:
         shape = self.create_geometry(entity)
       except RuntimeError:
         shape = None
+
       return shape
 
     wall_shapes = [_geom(x) for x in walls]
@@ -888,10 +885,28 @@ class IfcConverter:
     return results
 
   def openfoam_case(self,
-                    spaces,
+                    simplified,
                     save_dir,
                     case_name,
                     openfoam_options: dict = None):
+    """OpenFOAM 케이스 생성 및 저장
+
+    Parameters
+    ----------
+    simplified : dict
+        simplification 결과
+    save_dir : str, Path
+        저장 경로
+    case_name : str
+        저장할 케이스 이름 (save_dir/case_name에 결과 저장)
+    openfoam_options : dict, optional
+        options, by default None
+
+    Raises
+    ------
+    ValueError
+        OpenFOAM 설정 입력 오류
+    """
     if openfoam_options is None:
       opt = self.openfoam_options.copy()
     else:
@@ -900,6 +915,7 @@ class IfcConverter:
     missing = [x for x in self.default_openfoam_options if x not in opt]
     if missing:
       raise ValueError('Missing OpenFOAM conditions: {}'.format(missing))
+
     unused = [x for x in opt if x not in self.default_openfoam_options]
     if unused:
       warn('Unused OpenFOAM options: {}'.format(unused))
@@ -915,25 +931,13 @@ class IfcConverter:
     if not os.path.exists(working_dir):
       os.mkdir(working_dir)
 
-    # 형상 단순화
-    simplified = self.simplify_space(
-        spaces=spaces,
-        save_dir=os.path.join(working_dir, 'geometry'),
-        case_name='geometry',
-        threshold_volume=self.threshold_internal_volume,
-        threshold_dist=self.threshold_surface_dist,
-        threshold_angle=self.threshold_surface_angle,
-        fuzzy=self.fuzzy,
-        relative_threshold=self.relative_threshold,
-        preserve_opening=self.preserve_opening,
-        opening_volume=self.extract_opening_volume)
     is_simplified = simplified['info']['simplification']['is_simplified']
 
     if extract_external_zone:
       if is_simplified:
         shape = simplified['simplified']
       else:
-        shape = simplified['shape']
+        shape = simplified['original']
 
       zone, zone_faces = make_external_zone(
           shape, buffer_size=opt['external_zone_size'])

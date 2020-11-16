@@ -43,6 +43,7 @@ class DropDownMenu(MDBoxLayout):
   text = StringProperty('')
   text_width = NumericProperty(0)
   font_name = StringProperty('')
+  width_mult = NumericProperty(1)
 
   def __init__(self, *args, **kwargs):
     super(DropDownMenu, self).__init__(*args, **kwargs)
@@ -66,7 +67,9 @@ class DropDownMenu(MDBoxLayout):
   def menu(self):
     if self._menu is None:
       self._menu = MDDropdownMenu()
-      self._menu.width_mult = 8
+      self._menu.width_mult = 10
+      self._menu.use_icon_item = True
+
       self._items = None
       # TODO: items 없애고 menu 아이템으로 연결
 
@@ -134,6 +137,9 @@ class DropDownMenu(MDBoxLayout):
     assert isinstance(value, (int, float))
     self._text_width = int(value)
     self.set_button_text(self._button.text)
+
+  def on_width_mult(self, instance, value):
+    self.menu.width_mult = value
 
 
 def make_drop_down_item(text, right_text=None, icon=None, right_icon=None):
