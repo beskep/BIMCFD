@@ -1,14 +1,14 @@
-import sys
+import re
 from pathlib import Path
 
-from kivy.metrics import dp
 from kivy.clock import mainthread
+from kivy.metrics import dp
 
-_SRC_DIR = Path(__file__).parents[1]
-if str(_SRC_DIR) not in sys.path:
-  sys.path.append(str(_SRC_DIR))
+try:
+  import utils
+except Exception:
+  raise
 
-import utils
 from converter import ifc_converter as ifccnv
 from converter import openfoam
 
@@ -18,6 +18,25 @@ from interface.widgets import topo_widget as topo
 from interface.widgets.drop_down import DropDownMenu
 from interface.widgets.panel_title import PanelTitle
 from interface.widgets.text_field import TextFieldPath, TextFieldUnit
+
+
+class IfcEntityText:
+  text_format = '[{:{fmt}d}] {}'
+  pattern = re.compile('^\[(\d+)\] (.*)$')
+
+  @classmethod
+  def menu_text(cls, index: int, name, width: int = None):
+    fmt = '' if width is None else '0{}'.format(width)
+    text = cls.text_format.format(index, name, fmt=fmt)
+
+    return text
+
+  @classmethod
+  def index(cls, text: str):
+    match = cls.pattern.match(text)
+    index = int(match.group(1))
+
+    return index
 
 
 class BimCfdApp(BimCfdAppBase):
@@ -43,26 +62,30 @@ class BimCfdApp(BimCfdAppBase):
     if self.file_manager.mode == 'bim' and path.suffix.lower() == '.ifc':
       self.load_ifc(path)
 
-  # @with_spinner
+  @with_spinner
   def load_ifc(self, path: Path):
     try:
       self._converter = ifccnv.IfcConverter(path=path.as_posix())
     except Exception as e:
       self._logger.error(e)
       self.show_snackbar('IFC 로드 실패')
+      return
 
     options = self.get_simplification_options()
     if options is not None:
       self._converter.brep_deflection = options['precision']
       self.update_ifc_spaces()
 
+  @mainthread
   def update_ifc_spaces(self):
     if self._converter is not None:
       spaces = self._converter.ifc.by_type('IfcSpace')
       width = len(str(len(spaces) + 1))
 
       names = [
-          'Space {:0{}d}.  {}'.format(i + 1, width, ifccnv.entity_name(entity))
+          IfcEntityText.menu_text(index=(i + 1),
+                                  name=ifccnv.entity_name(entity),
+                                  width=width)
           for i, entity in enumerate(spaces)
       ]
       ids = [str(x.id()) for x in spaces]
@@ -83,12 +106,9 @@ class BimCfdApp(BimCfdAppBase):
       self.show_snackbar('공간을 선택해주세요')
       space_entity = None
     else:
-      # TODO: string으로부터 id 추출...
       selected_text = self.spaces_menu.selected_item_text()
-      assert '.' in selected_text
-
-      space_idx = selected_text[:selected_text.find('.')][6:]
-      space_entity = self._spaces[int(space_idx) - 1]
+      index = IfcEntityText.index(selected_text)
+      space_entity = self._spaces[index - 1]
 
     return space_entity
 

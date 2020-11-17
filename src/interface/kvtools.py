@@ -38,3 +38,18 @@ def set_window_size(size: tuple):
   from kivy.core.window import Window
 
   Window.size = size
+
+  try:
+    # Window를 중앙에 정렬
+    import ctypes
+
+    user32 = ctypes.windll.user32
+    screen_width = user32.GetSystemMetrics(0)
+    screen_height = user32.GetSystemMetrics(1)
+
+    if (size[0] <= screen_width) and (size[1] <= screen_height):
+      Window.left = int((screen_width - size[0]) / 2.0)
+      Window.top = int((screen_height - size[1]) / 2.0)
+
+  except Exception:
+    pass

@@ -370,8 +370,8 @@ class OpenFoamCase(ButterflyCase):
 
     with open(mesh, 'w') as f:
       f.write('''surfaceFeatureEdges -angle 0 geometry.obj geometry.fms
-      cartesianMesh
-      checkMesh | tee log.mesh''')
+cartesianMesh
+checkMesh | tee log.mesh''')
 
   def change_boundary_field(self, variable, boundary_field: BoundaryFieldDict):
     foam_file = None

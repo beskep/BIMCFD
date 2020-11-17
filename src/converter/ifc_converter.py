@@ -5,6 +5,7 @@ from itertools import chain, combinations
 from shutil import copy2
 from typing import Iterable, List, Tuple, Union
 from warnings import warn
+import logging
 
 import ifcopenshell
 import ifcopenshell.geom
@@ -44,6 +45,8 @@ class IfcConverter:
                wall_types=('IfcWall',),
                slab_types=('IfcSlab',),
                covering_types=('IfcCovering',)):
+    self._logger = logging.getLogger(self.__class__.__name__)
+
     self._file_path = os.path.normpath(path)
     self._ifc = ifcopenshell.open(self._file_path)
     self._settings = ifcopenshell.geom.settings()
@@ -196,9 +199,9 @@ class IfcConverter:
         shape = self.create_geometry(opening.RelatedOpeningElement)
         shapes.append(shape)
       except RuntimeError as e:
-        warn('Opening 추출 실패'
-             ':\n{}\n{}\n{}'.format(self.file_path,
-                                    opening.RelatedOpeningElement, e))
+        msg = ('Opening 추출 실패:\n{}\n{}\n{}'.format(
+            self.file_path, opening.RelatedOpeningElement, e))
+        self._logger.warning(msg)
 
     return shapes
 
@@ -769,7 +772,7 @@ class IfcConverter:
       threshold_angle = self.threshold_surface_angle
 
     if not any([threshold_volume, threshold_dist, threshold_angle]):
-      warn('단순화 조건이 설정되지 않았습니다. 원본 형상을 저장합니다.')
+      self._logger.info('단순화 조건이 설정되지 않았습니다. 원본 형상을 저장합니다.')
       simplified = shape
       fused = shape
       is_simplified = False
@@ -789,7 +792,7 @@ class IfcConverter:
                                     buffer_size=5.0)
         fused = fuse_compound(simplified)
       except RuntimeError as e:
-        warn('단순화 실패: {}'.format(e))
+        self._logger.error('단순화 실패:\n{}'.format(e))
         simplified = None
         fused = None
 
@@ -808,13 +811,13 @@ class IfcConverter:
                                     linear_deflection=self.brep_deflection[0],
                                     angular_deflection=self.brep_deflection[1])
       except (IOError, RuntimeError) as e:
-        warn('stl 저장 실패: {}'.format(e))
+        self._logger.error('stl 저장 실패:\n{}'.format(e))
 
       try:
         DataExchange.write_step_file(a_shape=simplified,
                                      filename=save_path + '.stp')
       except (IOError, RuntimeError) as e:
-        warn('stp 저장 실패: {}'.format(e))
+        self._logger.error('stp 저장 실패:\n{}'.format(e))
 
       try:
         write_obj(compound=simplified,
@@ -837,17 +840,19 @@ class IfcConverter:
                                 extract_opening_volume=opening_volume)
         valid_walls = [walls[wall_names.index(x)] for x in valid_names]
       except RuntimeError as e:
-        warn('obj 저장 실패: {}'.format(e))
+        self._logger.error('obj 저장 실패:\n{}'.format(e))
 
     info_original_geom = geometric_features(shape)
     if simplified is None:
       info_simplified_geom = None
     else:
       info_simplified_geom = geometric_features(simplified)
+
     if fused is None:
       info_fused_geom = None
     else:
       info_fused_geom = geometric_features(fused)
+
     info_simplification = {
         'threshold_volume': threshold_volume,
         'threshold_distance': threshold_dist,
@@ -895,7 +900,7 @@ class IfcConverter:
     ----------
     simplified : dict
         simplification 결과
-    save_dir : str, Path
+    save_dir : PathLike
         저장 경로
     case_name : str
         저장할 케이스 이름 (save_dir/case_name에 결과 저장)
@@ -918,7 +923,7 @@ class IfcConverter:
 
     unused = [x for x in opt if x not in self.default_openfoam_options]
     if unused:
-      warn('Unused OpenFOAM options: {}'.format(unused))
+      self._logger.warning('적용되지 않는 OpenFOAM 옵션들: {}'.format(unused))
 
     solver = opt['solver']
     if not OpenFoamCase.is_supported_solver(solver):
@@ -965,7 +970,7 @@ class IfcConverter:
     if os.path.exists(geom_path):
       copy2(src=geom_path, dst=os.path.join(working_dir, 'geometry.obj'))
     else:
-      warn('obj 추출에 실패했습니다.')
+      self._logger.warn('obj 추출에 실패했습니다.')
 
     # OpenFOAM 케이스 파일 생성
     open_foam_case = OpenFoamCase.from_template(solver=solver,
@@ -1056,10 +1061,14 @@ class IfcConverter:
 
     for idx in range(len(entities)):
       storey = storeys[idx]
-      code = '{}{:0{}d}{}{:0{}d}'.format(storey_prefix, storeys_index[idx],
-                                         storeys_len, prefix,
-                                         entity_index[storey_id(storey)],
-                                         entity_len[storey_id(storey)])
+      code = '{}{:0{}d}{}{:0{}d}'.format(
+          storey_prefix,
+          storeys_index[idx],
+          storeys_len,
+          prefix,
+          entity_index[storey_id(storey)],
+          entity_len[storey_id(storey)],
+      )
       entity_index[storey_id(storey)] += 1
       codes[idx] = code
 
@@ -1085,26 +1094,26 @@ def get_bounded_by(space: IfcEntity):
   try:
     boundaries = [x.RelatedBuildingElement for x in space.BoundedBy]
   except AttributeError:
-    return None
+    boundaries = None
 
   return boundaries
 
 
-def write_each_shapes(shape: TopoDS_Compound, save_dir):
+def write_each_shapes(shape: TopoDS_Compound, save_dir, mkdir=False):
   """compound를 구성하는 각 shape을 저장
 
   Parameters
   ----------
   shape : TopoDS_Compound
       대상 compound
-  save_dir : [type]
+  save_dir : PathLike
       저장 위치
   """
   exp = TopologyExplorer(shape)
   if exp.number_of_solids() <= 1:
-    return
+    raise ValueError('대상 shape에 solid가 없음')
 
-  if not os.path.exists(save_dir):
+  if not os.path.exists(save_dir) and mkdir:
     os.mkdir(save_dir)
 
   solids = exp.solids()
@@ -1119,4 +1128,5 @@ def entity_name(entity: IfcEntity) -> str:
   else:
     res = entity.Name
     assert isinstance(res, str)
+
   return res

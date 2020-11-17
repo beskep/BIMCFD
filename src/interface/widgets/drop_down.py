@@ -95,6 +95,13 @@ class DropDownMenu(MDBoxLayout):
     self._items = value
     self.menu.items = value
 
+    has_items = len(self.menu.menu.ids.box.children)
+    if has_items:
+      # 이미 menu에 아이템이 존재하는 경우
+      self.menu.menu.ids.box.clear_widgets()
+      self.menu.create_menu_items()
+      self.menu.set_menu_properties(interval=None)
+
   def set_items(self, text: list, right_text=None, icon=None, right_icon=None):
     # TODO: 첫 번째 right_text가 None으로 설정되는 문제 해결
     # TODO: 'icon' 설정 안되는 문제 해결
