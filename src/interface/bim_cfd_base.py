@@ -83,9 +83,7 @@ class BimCfdAppBase(MDApp):
     self._spinner: MDSpinner = None
 
     self._snackbar = Snackbar()
-    # self._snackbar.snackbar_x = dp(10)
-    # self._snackbar.snackbar_y = dp(10)
-    self._snackbar.duration = 1
+    self._snackbar.duration = 2
 
     self._cfd_dialog = None
 

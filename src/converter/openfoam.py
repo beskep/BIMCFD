@@ -23,7 +23,6 @@ _DEFAULT_HEADER = \
     '''
 Header.set_header(_DEFAULT_HEADER)
 
-_FILE_DIR = os.path.dirname(__file__)
 _SOLVERS = (
     'simpleFoam',
     'buoyantSimpleFoam',
@@ -42,6 +41,10 @@ _SOLVERS_TURBULENCE = (
 _SOLVER_PATH = {x.lower(): TEMPLATE_DIR.joinpath(x) for x in _SOLVERS}
 for x in _SOLVER_PATH.values():
   assert x.exists(), x
+
+_MESH_SH = (b'surfaceFeatureEdges -angle 0 geometry.obj geometry.fms\n'
+            b'cartesianMesh\n'
+            b'checkMesh | tee log.mesh')
 
 
 def supported_solvers(energy=False,
@@ -224,6 +227,8 @@ class OpenFoamCase(ButterflyCase):
             flag_header = False
 
         try:
+          if str(p) == 'controlDict':
+            print()
           foam_file = cls._Case__create_foamfile_from_file(
               p, 1.0 / convert_from_meters)
 
@@ -338,7 +343,12 @@ class OpenFoamCase(ButterflyCase):
       foam_files = (
           ff for ff in self.foam_files if ff.name in self.MINFOAMFIles)
     else:
-      foam_files = self.foam_files
+      foam_files = list(self.foam_files)
+
+      for fname in self.MINFOAMFIles:
+        if fname not in [x.name for x in foam_files]:
+          ff = FoamFile(name=fname, cls='dictionary', location='system')
+          foam_files.append(ff)
 
     for f in foam_files:
       if self.original_dir and (f.location != '"0"') and (f.name != 'meshDict'):
@@ -366,12 +376,11 @@ class OpenFoamCase(ButterflyCase):
     print('{} is saved to: {}'.format(self.project_name, self.project_dir))
 
   def save_shell(self):
+    # todo: decomposePar, run 지원
     mesh = os.path.join(self.project_dir, 'mesh.sh')
 
-    with open(mesh, 'w') as f:
-      f.write('''surfaceFeatureEdges -angle 0 geometry.obj geometry.fms
-cartesianMesh
-checkMesh | tee log.mesh''')
+    with open(mesh, 'wb') as f:
+      f.write(_MESH_SH)
 
   def change_boundary_field(self, variable, boundary_field: BoundaryFieldDict):
     foam_file = None

@@ -50,8 +50,8 @@ class BimCfdApp(BimCfdAppBase):
 
     self._simplified: dict = None
 
-  def build_and_initialize(self):
-    self.manual_build()
+  def on_start(self):
+    super(BimCfdApp, self).on_start()
 
     self.solver_menu.set_items(text=openfoam.supported_solvers())
 
@@ -151,8 +151,7 @@ class BimCfdApp(BimCfdAppBase):
       return
 
     if options['flag_simplify']:
-      # degree to rad
-      options['angle_threshold'] *= (3.141592 / 180)
+      options['angle_threshold'] *= (3.141592 / 180) # degree to rad
     else:
       options['dist_threshold'] = 0.0
       options['vol_threshold'] = 0.0
@@ -174,7 +173,7 @@ class BimCfdApp(BimCfdAppBase):
 
     self.show_simplification_results()
     self.execute_button.disabled = False
-    self.show_snackbar('형상 전처리 완료', duration=1)
+    self.show_snackbar('형상 전처리 완료')
 
   @mainthread
   def show_simplification_results(self):
@@ -203,8 +202,15 @@ class BimCfdApp(BimCfdAppBase):
     self.visualize_topology(spaces=[geom])
 
   @with_spinner
-  def _execute_helper(self, simplified, save_dir, openfoam_options):
+  def _execute_helper(self, simplified, save_dir: Path, openfoam_options):
     assert simplified is not None
+
+    geom_dir = save_dir.joinpath('BIMCFD', 'geometry')
+    if not geom_dir.exists():
+      geom_dir.mkdir(parents=True)
+
+    self._converter.save_simplified_space(simplified=simplified,
+                                          path=geom_dir.as_posix())
     self._converter.openfoam_case(simplified=simplified,
                                   save_dir=save_dir,
                                   case_name='BIMCFD',
@@ -246,7 +252,7 @@ class BimCfdApp(BimCfdAppBase):
     )
 
 
-if __name__ == "__main__":
+def main():
   font_regular = utils.RESOURCE_DIR.joinpath('NotoSansCJKkr-Medium.otf')
   font_bold = utils.RESOURCE_DIR.joinpath('NotoSansCJKkr-Bold.otf')
 
@@ -268,7 +274,7 @@ if __name__ == "__main__":
     kvtools.load_kv(kvpath)
 
   app = BimCfdApp()
-  app.build_and_initialize()
+  app.manual_build()
 
   # test
   # app.file_manager.mode = 'bim'
@@ -278,3 +284,7 @@ if __name__ == "__main__":
   #                  r'\Clinic_A_20110906_optimized.ifc'))
 
   app.run()
+
+
+if __name__ == "__main__":
+  main()

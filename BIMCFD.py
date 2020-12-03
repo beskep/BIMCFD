@@ -1,7 +1,13 @@
-import win32timezone
+import fuzzywuzzy
+import ifcopenshell
+import ifcopenshell.geom
+from fuzzywuzzy import fuzz, process
+from kivymd import app
 
-from src.interface import topo_app
+from src import utils
 from src.converter import ifc_converter, simplify
-from src.OCCUtils import Common, Construct, face, edge
+from src.interface import bim_cfd_base
+from src.interface import bim_cfd_app
+from src.OCCUtils import Common, Construct, edge, face
 
-topo_app.run_topo_app()
+bim_cfd_app.main()

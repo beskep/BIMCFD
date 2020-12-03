@@ -1,12 +1,12 @@
 import json
+import logging
 import os
 from collections import OrderedDict, defaultdict
 from itertools import chain, combinations
 from shutil import copy2
 from typing import Iterable, List, Tuple, Union
-from warnings import warn
-import logging
 
+from utils import TEMPLATE_DIR
 import ifcopenshell
 import ifcopenshell.geom
 from ifcopenshell import entity_instance as IfcEntity
@@ -14,7 +14,6 @@ from OCC.Core.TopoDS import TopoDS_Builder, TopoDS_Compound, TopoDS_Shape
 from OCC.Extend import DataExchange
 from OCC.Extend.TopologyUtils import TopologyExplorer
 
-from utils import TEMPLATE_DIR
 from converter.material_match import MaterialMatch
 from converter.obj_convert import write_obj
 from converter.openfoam import BoundaryFieldDict, OpenFoamCase
@@ -36,8 +35,18 @@ class IfcConverter:
 
   _default_openfoam_options = {
       'solver': 'simpleFoam',
+      'flag_energy': True,
+      'flag_friction': True,
+      'flag_interior_faces': False,
+      'flag_external_zone': False,
+      'external_zone_size': 5.0,
+      'external_temperature': 300,
+      'heat_transfer_coefficient': '1e8',
+      'max_cell_size': None,
+      'min_cell_size': None,
       'grid_resolution': 24.0,
-      'external_zone_size': 5.0
+      'boundary_cell_size': None,
+      'boundary_layers': None
   }
 
   def __init__(self,
@@ -772,7 +781,8 @@ class IfcConverter:
       threshold_angle = self.threshold_surface_angle
 
     if not any([threshold_volume, threshold_dist, threshold_angle]):
-      self._logger.info('단순화 조건이 설정되지 않았습니다. 원본 형상을 저장합니다.')
+      msg = '단순화 조건이 설정되지 않았습니다. 원본 형상을 저장합니다.'
+      self._logger.info(msg)
       simplified = shape
       fused = shape
       is_simplified = False
@@ -881,6 +891,7 @@ class IfcConverter:
         'fused': fused,
         'space': space,
         'walls': walls if valid_walls is None else valid_walls,
+        'wall_shapes': wall_shapes,
         'wall_names': wall_names if valid_names is None else valid_names,
         'openings': openings,
         'opening_names': ['Opening_{}'.format(x) for x in range(len(openings))],
@@ -888,6 +899,61 @@ class IfcConverter:
     }
 
     return results
+
+  def save_simplified_space(self, simplified: dict, path: str):
+    is_simplified = simplified['info']['simplification']['is_simplified']
+
+    if is_simplified:
+      shape = simplified['simplified']
+    else:
+      shape = simplified['original']
+
+    try:
+      DataExchange.write_stl_file(a_shape=shape,
+                                  filename=os.path.join(path, 'geometry.stl'),
+                                  linear_deflection=self.brep_deflection[0],
+                                  angular_deflection=self.brep_deflection[1])
+      if is_simplified:
+        compare = compare_shapes(simplified['original'], shape)
+        DataExchange.write_stl_file(a_shape=compare,
+                                    filename=os.path.join(
+                                        path, 'geometry_compare.stl'),
+                                    linear_deflection=self.brep_deflection[0],
+                                    angular_deflection=self.brep_deflection[1])
+    except (IOError, RuntimeError) as e:
+      self._logger.error('stl 저장 실패:\n{}'.format(e))
+
+    try:
+      DataExchange.write_step_file(a_shape=shape,
+                                   filename=os.path.join(path, 'geometry.stp'))
+    except (IOError, RuntimeError) as e:
+      self._logger.error('stp 저장 실패:\n{}'.format(e))
+
+    try:
+      extract_opening_volume = simplified['info']['simplification'][
+          'extract_opening_volume']
+      write_obj(compound=shape,
+                space=simplified['space'],
+                openings=simplified['openings'],
+                walls=simplified['wall_shapes'],
+                obj_path=os.path.join(path, 'geometry_interior.obj'),
+                deflection=self.brep_deflection,
+                wall_names=simplified['wall_names'],
+                extract_interior=True,
+                extract_opening_volume=extract_opening_volume)
+      write_obj(compound=shape,
+                space=simplified['space'],
+                openings=simplified['openings'],
+                walls=simplified['wall_shapes'],
+                obj_path=os.path.join(path, 'geometry.obj'),
+                deflection=self.brep_deflection,
+                wall_names=simplified['wall_names'],
+                extract_interior=False,
+                extract_opening_volume=extract_opening_volume)
+    except RuntimeError as e:
+      self._logger.error('obj 저장 실패:\n{}'.format(e))
+
+    return
 
   def openfoam_case(self,
                     simplified,
@@ -929,16 +995,15 @@ class IfcConverter:
     if not OpenFoamCase.is_supported_solver(solver):
       raise ValueError('지원하지 않는 solver입니다: {}'.format(solver))
 
-    extract_external_zone = (opt['external_zone_size'] and
-                             opt['external_zone_size'] > 1)
-
     working_dir = os.path.normpath(os.path.join(save_dir, case_name))
     if not os.path.exists(working_dir):
       os.mkdir(working_dir)
 
     is_simplified = simplified['info']['simplification']['is_simplified']
 
-    if extract_external_zone:
+    flag_external_zone = (opt['flag_external_zone'] and
+                          opt['external_zone_size'] > 1)
+    if flag_external_zone:
       if is_simplified:
         shape = simplified['simplified']
       else:
@@ -960,8 +1025,10 @@ class IfcConverter:
                 extract_opening_volume=self.extract_opening_volume)
 
     # geometry 폴더에 저장된 obj 파일을 OpenFOAM 케이스 폴더 가장 바깥에 복사
-    if extract_external_zone:
+    if flag_external_zone:
       geom_file = 'geometry_external.obj'
+    elif opt['flag_interior_faces']:
+      geom_file = 'geometry_interior.obj'
     else:
       geom_file = 'geometry.obj'
 
@@ -991,7 +1058,7 @@ class IfcConverter:
     wall_names = ['Surface_' + x for x in simplified['wall_names']]
     opening_names = simplified['opening_names']
 
-    if OpenFoamCase.is_energy_available(solver):
+    if OpenFoamCase.is_energy_available(solver) and opt['flag_energy']:
       bf_t = self.openfoam_temperature_dict(
           solver=solver,
           surface=simplified['walls'],
@@ -1002,7 +1069,7 @@ class IfcConverter:
           heat_transfer_coefficient=opt.get('heat_transfer_coefficient', '1e8'))
       open_foam_case.change_boundary_field(variable='T', boundary_field=bf_t)
 
-    if OpenFoamCase.is_turbulence_available(solver):
+    if OpenFoamCase.is_turbulence_available(solver) and opt['flag_friction']:
       bf_nut = self.openfoam_rough_wall_nut_dict(
           solver=solver,
           surface=simplified['walls'],
@@ -1017,11 +1084,11 @@ class IfcConverter:
                                       opening_names=opening_names,
                                       drop_fields=['T', 'nut'])
 
-    if 'max_cell_size' in opt:
+    if opt.get('max_cell_size', None):
       max_cell_size = opt['max_cell_size']
     else:
-      geom_info = simplified['info'][
-          'fused_geometry' if is_simplified else 'original_geometry']
+      geom_info = simplified['info'][('fused_geometry' if is_simplified else
+                                      'original_geometry')]
       max_cell_size = geom_info['characteristic_length'] / opt['grid_resolution']
 
     mesh_dict = self.openfoam_cf_mesh_dict(
