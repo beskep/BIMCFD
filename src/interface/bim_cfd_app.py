@@ -90,12 +90,10 @@ class BimCfdApp(BimCfdAppBase):
       ]
       ids = [str(x.id()) for x in spaces]
 
-      self.spaces_menu.set_items(
-          text=names,
-          right_text=ids,
-          icon='folder-outline',
-          # icon='floor-plan',  # TODO: Material Icon Font 업데이트
-          right_icon='identifier')
+      self.spaces_menu.set_items(text=names,
+                                 right_text=ids,
+                                 icon='floor-plan',
+                                 right_icon='identifier')
 
       self._spaces = spaces
     else:
@@ -151,7 +149,7 @@ class BimCfdApp(BimCfdAppBase):
       return
 
     if options['flag_simplify']:
-      options['angle_threshold'] *= (3.141592 / 180) # degree to rad
+      options['angle_threshold'] *= (3.141592 / 180)  # degree to rad
     else:
       options['dist_threshold'] = 0.0
       options['vol_threshold'] = 0.0

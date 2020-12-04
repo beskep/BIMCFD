@@ -74,7 +74,7 @@ class DropDownMenu(MDBoxLayout):
       # TODO: items 없애고 menu 아이템으로 연결
 
       self._menu.caller = self._button
-      self._menu.callback = self.select_item
+      self._menu.on_release = self.select_item
       self._button.on_release = self._menu.open
 
     return self._menu
@@ -104,7 +104,6 @@ class DropDownMenu(MDBoxLayout):
 
   def set_items(self, text: list, right_text=None, icon=None, right_icon=None):
     # TODO: 첫 번째 right_text가 None으로 설정되는 문제 해결
-    # TODO: 'icon' 설정 안되는 문제 해결
     if right_text is None or isinstance(right_text, str):
       right_text = itertools.repeat(right_text, len(text))
 
@@ -113,8 +112,6 @@ class DropDownMenu(MDBoxLayout):
 
     if right_icon is None or isinstance(right_icon, str):
       right_icon = itertools.repeat(right_icon, len(text))
-
-    # test = [list(x) for x in zip(text, right_text, icon, right_icon)]
 
     items = [
         make_drop_down_item(*x) for x in zip(text, right_text, icon, right_icon)

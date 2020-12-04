@@ -2,7 +2,6 @@ import fuzzywuzzy
 import ifcopenshell
 import ifcopenshell.geom
 from fuzzywuzzy import fuzz, process
-from kivymd import app
 
 from src import utils
 from src.converter import ifc_converter, simplify

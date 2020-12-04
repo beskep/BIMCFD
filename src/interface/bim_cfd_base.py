@@ -16,7 +16,7 @@ from kivymd.uix.spinner import MDSpinner
 from kivymd.uix.textfield import MDTextField
 
 from interface.widgets import topo_widget as topo
-from interface.widgets.cfd_setting import CfdSettingDialog
+from interface.widgets.cfd_setting import CfdSettingDialog, CfdSettingContent
 from interface.widgets.drop_down import DropDownMenu
 from interface.widgets.panel_title import PanelTitle
 from interface.widgets.text_field import TextFieldPath, TextFieldUnit
@@ -86,6 +86,7 @@ class BimCfdAppBase(MDApp):
     self._snackbar.duration = 2
 
     self._cfd_dialog = None
+    self._cfd_options = None
 
   def build(self):
     return BimCfdWidget()
@@ -102,11 +103,19 @@ class BimCfdAppBase(MDApp):
 
     if not root:
       msg = '{} failed to build'.format(__class__.__name__)
-      self._logger(msg)
+      self._logger.error(msg)
       raise WidgetException(msg)
 
     self.root = root
     self.built = True
+
+  def on_start(self):
+    super(BimCfdAppBase, self).on_start()
+
+    gap = dp(10)
+    self._snackbar.snackbar_x = gap
+    self._snackbar.snackbar_y = gap
+    self._snackbar.size_hint_x = (self.root.width - 2 * gap) / self.root.width
 
   @property
   def bim_path_field(self) -> TextFieldPath:
@@ -138,7 +147,7 @@ class BimCfdAppBase(MDApp):
         self.visualize_button.disabled = False
         self.simplify_button.disabled = False
 
-      self._space_menu.menu.callback = callback
+      self._space_menu.menu.on_release = callback
 
     return self._space_menu
 
@@ -192,8 +201,7 @@ class BimCfdAppBase(MDApp):
       cur_dir = self._save_dir
       ext = []
     else:
-      msg = 'file_manager.mode ({}) not in ["bim", "save"]'.format(
-          self.file_manager.mode)
+      msg = 'file_manager.mode ({}) not in ["bim", "save"]'.format(mode)
       self._logger.error(msg)
       raise ValueError(msg)
 
@@ -316,7 +324,9 @@ class BimCfdAppBase(MDApp):
       try:
         value = float(field.main_text)
       except ValueError:
-        self.show_snackbar('[{}] 설정값이 올바르지 않습니다.'.format(label))
+        msg = '[{}] 설정값이 올바르지 않습니다.'.format(label)
+        self._logger.warning(msg)
+        self.show_snackbar(msg)
         return None
 
       res[option] = value
@@ -330,7 +340,7 @@ class BimCfdAppBase(MDApp):
       self._snackbar.duration = duration
 
     try:
-      self._snackbar.show()
+      self._snackbar.open()
     except WidgetException:
       # 이미 보이는 (animation 중인) snackbar가 존재함
       # 이번 요청은 무시
