@@ -27,12 +27,11 @@ from OCC.Core.TopoDS import (TopoDS_Compound, TopoDS_Face, TopoDS_Shape,
                              TopoDS_Solid)
 from OCC.Core.TopTools import TopTools_ListOfShape
 from OCC.Extend.TopologyUtils import TopologyExplorer
-from scipy.spatial import ConvexHull
-from tqdm import tqdm
-
 from OCCUtils.Common import GpropsFromShape
 from OCCUtils.Construct import compound, face_normal, make_plane
 from OCCUtils.face import Face
+from scipy.spatial import ConvexHull
+from tqdm import tqdm
 
 
 def make_box(*args):

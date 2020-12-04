@@ -365,7 +365,6 @@ class OpenFoamCase(ButterflyCase):
         path_to = os.path.join(self.project_dir, sub_folder, file_name)
         copy2(path_from, path_to)
       else:
-        # TODO: foam file 저장 함수 새로 만들기
         f.save(self.project_dir)
 
     # add .foam file

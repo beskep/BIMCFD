@@ -1,17 +1,13 @@
 import re
 from pathlib import Path
 
+import utils
+
 from kivy.clock import mainthread
 from kivy.metrics import dp
 
-try:
-  import utils
-except Exception:
-  raise
-
 from converter import ifc_converter as ifccnv
 from converter import openfoam
-
 from interface import kvtools
 from interface.bim_cfd_base import BimCfdAppBase, with_spinner
 from interface.widgets import topo_widget as topo
@@ -22,7 +18,7 @@ from interface.widgets.text_field import TextFieldPath, TextFieldUnit
 
 class IfcEntityText:
   text_format = '[{:{fmt}d}] {}'
-  pattern = re.compile('^\[(\d+)\] (.*)$')
+  pattern = re.compile(r'^\[(\d+)\] (.*)$')
 
   @classmethod
   def menu_text(cls, index: int, name, width: int = None):

@@ -9,18 +9,17 @@ from itertools import chain
 import numpy as np
 import pandas as pd
 from OCC.Core import BRep
-from OCC.Core.BRep import BRep_Tool_Surface, BRep_Tool
+from OCC.Core.BRep import BRep_Tool, BRep_Tool_Surface
 from OCC.Core.BRepMesh import BRepMesh_IncrementalMesh
-from OCC.Extend import DataExchange
-from OCC.Extend import TopologyUtils
+from OCC.Extend import DataExchange, TopologyUtils
+from OCCUtils import Construct
+from OCCUtils.Common import GpropsFromShape
+from OCCUtils.face import Face
 from scipy import stats
 from tqdm import tqdm
 
-from OCCUtils.Common import GpropsFromShape
-from OCCUtils import Construct
-from OCCUtils.face import Face
+from .simplify import fix_shape, fuse_compound, maker_volume, shapes_distance
 from .visualize import Vis
-from .simplify import (maker_volume, fuse_compound, fix_shape, shapes_distance)
 
 pattern = re.compile('.*vol([.0-9]+)_dist([.0-9]+)_fuzzy([.0-9]+).*')
 

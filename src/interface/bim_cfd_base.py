@@ -16,7 +16,7 @@ from kivymd.uix.spinner import MDSpinner
 from kivymd.uix.textfield import MDTextField
 
 from interface.widgets import topo_widget as topo
-from interface.widgets.cfd_setting import CfdSettingDialog, CfdSettingContent
+from interface.widgets.cfd_setting import CfdSettingDialog
 from interface.widgets.drop_down import DropDownMenu
 from interface.widgets.panel_title import PanelTitle
 from interface.widgets.text_field import TextFieldPath, TextFieldUnit
@@ -355,12 +355,12 @@ class BimCfdAppBase(MDApp):
 
   def add_geom_table(self, column_data, row_data):
     data_table = MDDataTable(column_data=column_data, row_data=row_data)
-    data_table.pos_hint = {'center_x': 0.5, 'center_x': 0.5}
+    data_table.pos_hint = {'center_x': 0.5, 'center_y': 0.5}
 
     self.geom_table_layout.add_widget(data_table)
 
   def add_material_table(self, column_data, row_data):
     data_table = MDDataTable(column_data=column_data, row_data=row_data)
-    data_table.pos_hint = {'center_x': 0.5, 'center_x': 0.5}
+    data_table.pos_hint = {'center_x': 0.5, 'center_y': 0.5}
 
     self.material_table_layout.add_widget(data_table)

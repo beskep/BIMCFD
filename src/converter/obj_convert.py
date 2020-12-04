@@ -7,6 +7,8 @@ from tempfile import TemporaryDirectory
 from typing import Collection, Iterable, Union
 from warnings import warn
 
+import utils
+
 import numpy as np
 from OCC.Core.BRepAlgo import BRepAlgo_Common
 from OCC.Core.BRepBuilderAPI import BRepBuilderAPI_MakeVertex
@@ -16,7 +18,6 @@ from OCC.Extend.TopologyUtils import TopologyExplorer
 from OCCUtils.Common import GpropsFromShape
 from OCCUtils.Construct import compound
 
-import utils
 from converter.simplify import face_info, get_boundingbox, shapes_distance
 
 DEFAULT_BLENDER_PATH = r'C:\Program Files\Blender Foundation\Blender\blender'

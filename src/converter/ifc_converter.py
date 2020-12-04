@@ -7,6 +7,7 @@ from shutil import copy2
 from typing import Iterable, List, Tuple, Union
 
 from utils import TEMPLATE_DIR
+
 import ifcopenshell
 import ifcopenshell.geom
 from ifcopenshell import entity_instance as IfcEntity

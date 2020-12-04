@@ -2,11 +2,10 @@ import itertools
 
 from kivy.lang.builder import Builder
 from kivy.properties import NumericProperty, StringProperty
+from kivy.uix.label import Label
 from kivymd.uix.boxlayout import MDBoxLayout
 from kivymd.uix.dropdownitem import MDDropDownItem
 from kivymd.uix.menu import MDDropdownMenu, RightContent
-from kivymd.uix.label import MDLabel
-from kivy.uix.label import Label
 
 
 class RightContentCls(RightContent):

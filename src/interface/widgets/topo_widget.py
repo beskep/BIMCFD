@@ -1,5 +1,7 @@
 from typing import List
 
+from utils import RESOURCE_DIR
+
 import numpy as np
 from kivy import graphics
 from kivy.app import App
@@ -9,7 +11,6 @@ from kivy.uix.widget import Widget
 
 from interface.utf_app import UtfApp
 from interface.widgets.topo_mesh import TopoDsMesh
-from utils import RESOURCE_DIR
 
 _GLSL_PATH = RESOURCE_DIR.joinpath('color.glsl')
 assert _GLSL_PATH.exists()
