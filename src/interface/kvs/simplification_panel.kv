@@ -36,18 +36,16 @@
                             id: flag_relative_threshold
                             active: True
                             on_state: app.check_relative_threshold(self.state)
-                            # disabled: True
                         MDCheckbox:
                             id: flag_preserve_openings
                             active: True
-                            # disabled: True
                         MDCheckbox:
                             id: flag_opening_volume
                             active: True
-                            # disabled: True
                         MDCheckbox:
                             id: flag_internal_faces
-                        # disabled: True
+                        MDCheckbox:
+                            id: flag_external_zone
 
                     MDBoxLayout:
                         orientation: 'vertical'
@@ -61,6 +59,8 @@
                             text: '개구부 형상 보존'
                         MDLabel:
                             text: '개구부 부피 보존'
+                        MDLabel:
+                            text: '내부 표면 추출'
                         MDLabel:
                             text: '외부 영역 추출'
 

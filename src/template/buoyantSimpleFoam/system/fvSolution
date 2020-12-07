@@ -23,7 +23,7 @@ solvers
         tolerance        1e-8;
         relTol           0.01;
 
-        smoother         DICGaussSeidel;
+        smoother         GaussSeidel;
 
     }
 
@@ -38,7 +38,7 @@ solvers
 
 SIMPLE
 {
-    momentumPredictor no;
+    // momentumPredictor no;
     nNonOrthogonalCorrectors 0;
     pRefCell        0;
     pRefValue       0;
@@ -58,14 +58,14 @@ relaxationFactors
 {
     fields
     {
-        rho             1.0;
-        p_rgh           0.7;
+        rho             0.8;
+        p_rgh           0.5;
     }
     equations
     {
-        U               0.3;
-        h               0.3;
-        "(k|epsilon|omega)" 0.7;
+        U               0.8;
+        h               0.9;
+        "(k|epsilon|omega)" 0.8;
     }
 }
 

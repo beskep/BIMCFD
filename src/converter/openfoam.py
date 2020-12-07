@@ -96,8 +96,8 @@ def read_foam_file_header(path):
     for line in f:
       if line[0].isalnum():
         break
-      else:
-        header_lines.append(line)
+
+      header_lines.append(line)
 
   header = ''.join(header_lines)
   if 'OpenFOAM' not in header:
@@ -110,10 +110,11 @@ class BoundaryFieldDict(OrderedDict):
   """OpenFOAM의 boundary field에 주석과 빈 줄을 추가하기 위한 클래스
   """
 
-  def __init__(self, *args, **kwargs):
-    super().__init__(*args, **kwargs)
+  def __init__(self, width=None, **kwargs):
+    super().__init__(**kwargs)
+
     self.__key = ' '
-    self._width = None
+    self._width = width
 
   def set_width(self, width: int):
     self._width = width
@@ -161,9 +162,7 @@ class OpenFoamCase(ButterflyCase):
     if geometries is None:
       geometries = []
 
-    super(OpenFoamCase, self).__init__(name=name,
-                                       foamfiles=foamfiles,
-                                       geometries=geometries)
+    super().__init__(name=name, foamfiles=foamfiles, geometries=geometries)
 
     self.working_dir = os.path.normpath(working_dir)
     self._original_dir = None
@@ -172,7 +171,7 @@ class OpenFoamCase(ButterflyCase):
   @property
   def foam_files(self) -> Tuple[FoamFile]:
     """Get all the foam_files."""
-    return tuple(f for f in self._Case__foamfiles)
+    return super().foam_files
 
   @property
   def original_dir(self):
@@ -206,6 +205,11 @@ class OpenFoamCase(ButterflyCase):
     return solver.lower() in [x.lower() for x in _SOLVERS_TURBULENCE]
 
   @classmethod
+  def create_foamfile_from_file(cls, p, convert_to_meters):
+    return cls._Case__create_foamfile_from_file(
+        p=p, convertToMeters=convert_to_meters)
+
+  @classmethod
   def from_folder(cls, path, working_dir, name=None, convert_from_meters=1):
     """Create a Butterfly case from a case folder.
 
@@ -237,16 +241,16 @@ class OpenFoamCase(ButterflyCase):
           flag_header = False
 
       try:
-        foam_file = cls._Case__create_foamfile_from_file(
-            p, 1.0 / convert_from_meters)
+        foam_file = cls.create_foamfile_from_file(
+            p=p, convert_to_meters=(1.0 / convert_from_meters))
 
         if foam_file:
           ff.append(foam_file)
 
-        cls.logger.debug(f'Imported {p} from case')
+        cls.logger.debug('Imported %s from case', os.path.normpath(p))
 
       except Exception as e:
-        cls.logger.error(f'Failed to import {p}:\n\t{e}')
+        cls.logger.error('Failed to import %s:\n\t%s', os.path.normpath(p), e)
         raise e
 
     bf_geometries = []
@@ -316,10 +320,10 @@ class OpenFoamCase(ButterflyCase):
     else:
       foam_files = list(self.foam_files)
 
-      for fname in self.MINFOAMFIles:
-        if fname not in [x.name for x in foam_files]:
-          ff = FoamFile(name=fname, cls='dictionary', location='system')
-          foam_files.append(ff)
+    for fname in self.MINFOAMFIles:
+      if fname not in [x.name for x in foam_files]:
+        ff = FoamFile(name=fname, cls='dictionary', location='system')
+        foam_files.append(ff)
 
     for f in foam_files:
       if self.original_dir and (f.location != '"0"') and (f.name != 'meshDict'):
@@ -327,10 +331,6 @@ class OpenFoamCase(ButterflyCase):
         file_name = f.name
 
         path_from = os.path.join(self.original_dir, sub_folder, file_name)
-        # if file_name == 'blockMeshDict' and not os.path.exists(path_from):
-        #   file_name = 'meshDict'
-        #   path_from = os.path.join(self.original_dir, sub_folder, file_name)
-
         assert os.path.exists(path_from)
 
         path_to = os.path.join(self.project_dir, sub_folder, file_name)
@@ -343,7 +343,7 @@ class OpenFoamCase(ButterflyCase):
     with open(foam_path, 'w') as f:
       f.write('')
 
-    print('{} is saved to: {}'.format(self.project_name, self.project_dir))
+    self.logger.info('%s is saved to: %s', self.project_name, self.project_dir)
 
   def save_shell(self):
     # todo: decomposePar, run 지원

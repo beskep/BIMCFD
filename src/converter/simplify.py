@@ -1012,12 +1012,15 @@ def geometric_features(shape: TopoDS_Shape):
   volume = gprops.volume().Mass()
   area = gprops.surface().Mass()
 
-  features = OrderedDict([('volume', volume), ('area', area),
-                          ('characteristic_length', volume / area),
-                          ('solid_count', exp.number_of_solids()),
-                          ('face_count', exp.number_of_faces()),
-                          ('edge_count', exp.number_of_edges()),
-                          ('vertex_count', exp.number_of_vertices())])
+  features = OrderedDict([
+      ('volume', volume),
+      ('area', area),
+      ('characteristic_length', volume / area),
+      ('solid_count', exp.number_of_solids()),
+      ('face_count', exp.number_of_faces()),
+      ('edge_count', exp.number_of_edges()),
+      ('vertex_count', exp.number_of_vertices()),
+  ])
 
   return features
 

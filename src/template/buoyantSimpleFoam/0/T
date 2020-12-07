@@ -28,8 +28,7 @@ boundaryField
 
     wall
     {
-        type            fixedValue;
-        value           $internalField;
+        type            zeroGradient;
     }
 }
 

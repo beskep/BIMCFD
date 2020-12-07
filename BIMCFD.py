@@ -1,4 +1,3 @@
-import fuzzywuzzy
 import ifcopenshell
 import ifcopenshell.geom
 from fuzzywuzzy import fuzz, process

@@ -15,6 +15,21 @@ _GLSL_PATH = RESOURCE_DIR.joinpath('color.glsl')
 assert _GLSL_PATH.exists()
 
 
+def ignore_under_touch(fn):
+
+  def wrap(self, touch):
+    gl: list = touch.grab_list
+
+    if not gl or (self is gl[0]()):
+      fn_ = fn(self, touch)
+    else:
+      fn_ = fn
+
+    return fn_
+
+  return wrap
+
+
 class BaseRenderer(Widget):
 
   ROTATE_SPEED = 1.0
@@ -89,15 +104,6 @@ class BaseRenderer(Widget):
     if self.SCALE_RANGE[0] <= new_scale <= self.SCALE_RANGE[1]:
       self.scale.xyz = (new_scale,) * 3
 
-  def ignore_under_touch(fn):
-
-    def wrap(self, touch):
-      gl = touch.grab_list
-      if not len(gl) or (self is gl[0]()):
-        return fn(self, touch)
-
-    return wrap
-
   @ignore_under_touch
   def on_touch_down(self, touch):
     touch.grab(self)
@@ -170,7 +176,11 @@ class TopoRenderer(BaseRenderer):
     app = App.get_running_app()
 
     # Calculate new left edge for the clip matrix
-    ratio = app.root.width / self.width
+    if app.root:
+      ratio = app.root.width / self.width
+    else:
+      ratio = 1.0
+
     scene_width0 = np.abs(self.bbox[0, 0] - self.bbox[1, 0])
     scene_width1 = ratio * scene_width0
     left = np.min(self.bbox[:, 0]) - (scene_width1 - scene_width0)
@@ -254,7 +264,15 @@ if __name__ == "__main__":
 
   class _RendererApp(MDApp):
 
+    def __init__(self, **kwargs):
+      super().__init__(**kwargs)
+      self._topo_renderer = None
+
     def build(self):
-      return TopoRenderer(shapes=[box_mesh, cone_mesh])
+      self._topo_renderer = TopoRenderer(shapes=[box_mesh, cone_mesh])
+      return self._topo_renderer
+
+    def on_start(self):
+      self._topo_renderer.update_glsl()
 
   _RendererApp().run()

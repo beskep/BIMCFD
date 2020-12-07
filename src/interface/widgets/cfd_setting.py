@@ -36,11 +36,11 @@ class CfdSettingContent(MDBoxLayout):
       size_hint_y: 0.6
       MDBoxLayout:
         MDCheckbox:
-          active: False
+          active: True
           size_hint_x: None
-          id: flag_energy
+          id: flag_heat_flux
         MDLabel:
-          text: 'Energy 해석'
+          text: '열유속 해석'
 
       MDBoxLayout:
         MDCheckbox:
@@ -48,8 +48,8 @@ class CfdSettingContent(MDBoxLayout):
           size_hint_x: None
           id: flag_friction
         MDLabel:
-          text: 'Friction 해석'
-      
+          text: '벽면 마찰 해석'
+
     SpacingBox:
       TextFieldUnit:
         hint_text: '외부 온도'
@@ -85,7 +85,7 @@ class CfdSettingContent(MDBoxLayout):
           id: flag_mesh_size
         MDLabel:
           text: '격자 크기 설정'
-    
+
     SpacingBox:
       TextFieldUnit:
         hint_text: '격자 해상도'
@@ -108,7 +108,7 @@ class CfdSettingContent(MDBoxLayout):
         text: '5'
         unit: '배'
         id: text_external_size
-    
+
     SpacingBox:
       TextFieldUnit:
         hint_text: 'Boundary Cell Size'
@@ -134,7 +134,7 @@ class CfdSettingContent(MDBoxLayout):
 
 class CfdSettingDialog(MDDialog):
   _option_ids = (
-      'flag_energy',
+      'flag_heat_flux',
       'flag_friction',
       'text_external_temperature',
       'text_external_htc',
@@ -157,6 +157,8 @@ class CfdSettingDialog(MDDialog):
 
     content = CfdSettingContent()
     self.content_height = content.height
+    self._spacer_top = 0
+    self._options = None
 
     kwargs['type'] = 'custom'
     kwargs['content_cls'] = content
@@ -164,15 +166,14 @@ class CfdSettingDialog(MDDialog):
 
     super().__init__(title=title, **kwargs)
 
-    self._options = None
-    # todo: 모델 특성길이에 따라 해상도 변경
+    # todo: 격자 해상도/크기 라디오 버튼 선택에 따라 입력 필드 활성/비활성화
 
   @property
   def options(self):
     if self._options is None:
       self._get_options()
 
-    return self._options
+    return self._options.copy()
 
   def update_height(self, *args):
     """대부분은 버그입니다."""
@@ -203,3 +204,7 @@ class CfdSettingDialog(MDDialog):
   def _get_options_and_dismiss(self):
     self._get_options()
     self.dismiss()
+
+  def set_grid_resolution(self, resolution: float):
+    widget: TextFieldUnit = self.content_cls.ids.text_mesh_resolution
+    widget.text = str(resolution)

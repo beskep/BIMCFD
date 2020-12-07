@@ -11,5 +11,8 @@ TEMPLATE_DIR = SRC_DIR.joinpath('template')
 
 _SRC_DIR = SRC_DIR.as_posix()
 if SRC_DIR not in sys.path:
-  print('Source dir:', _SRC_DIR)
+  import logging
+
+  logger = logging.getLogger(__name__)
+  logger.info('Source dir: %s', _SRC_DIR)
   sys.path.insert(0, _SRC_DIR)

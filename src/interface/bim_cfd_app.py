@@ -11,9 +11,6 @@ from converter import openfoam
 from interface import kvtools
 from interface.bim_cfd_base import BimCfdAppBase, with_spinner
 from interface.widgets import topo_widget as topo
-from interface.widgets.drop_down import DropDownMenu
-from interface.widgets.panel_title import PanelTitle
-from interface.widgets.text_field import TextFieldPath, TextFieldUnit
 
 
 class IfcEntityText:
@@ -151,6 +148,7 @@ class BimCfdApp(BimCfdAppBase):
       options['vol_threshold'] = 0.0
       options['angle_threshold'] = 0.0
 
+    # 단순화
     simplified = self._converter.simplify_space(
         spaces=space,
         save_dir=None,
@@ -162,8 +160,17 @@ class BimCfdApp(BimCfdAppBase):
         preserve_opening=options['flag_preserve_openings'],
         opening_volume=options['flag_opening_volume'])
     assert simplified is not None
-
     self._simplified = simplified
+
+    # 해상도 설정
+    cl = simplified['info']['original_geometry']['characteristic_length']
+    if cl < 0.5:
+      grid_resolution = 8
+    elif cl < 0.7:
+      grid_resolution = 16
+    else:
+      grid_resolution = 24
+    self.cfd_dialog.set_grid_resolution(resolution=grid_resolution)
 
     self.show_simplification_results()
     self.execute_button.disabled = False
@@ -224,19 +231,13 @@ class BimCfdApp(BimCfdAppBase):
       self.show_snackbar('형상 전처리가 완료되지 않았습니다')
       return
 
-    # solver = self.solver_menu.selected_item_text()
-    # ofoptions = {'solver': solver}
-    ofoptions = {
-        'solver': 'simpleFoam',
-        'flag_friction': False,
-        'grid_resolution': 8
-    }
+    of_options = self.get_openfoam_options()
 
-    # TODO: internal face 설정 적용
-    # TODO: external zone 설정 적용
     self._execute_helper(simplified=self._simplified,
                          save_dir=save_dir,
-                         openfoam_options=ofoptions)
+                         openfoam_options=of_options)
+
+    self._logger.info('Saved CFD case')
 
   def test_add_tables(self):
     self.add_geom_table(

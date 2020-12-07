@@ -83,7 +83,12 @@ class DropDownMenu(MDBoxLayout):
     return self._selected_item
 
   def selected_item_text(self) -> str:
-    return self.selected_item.text
+    if self.selected_item is None:
+      text = self.button.text
+    else:
+      text = self.selected_item.text
+
+    return text
 
   @property
   def items(self):
@@ -102,7 +107,6 @@ class DropDownMenu(MDBoxLayout):
       self.menu.set_menu_properties(interval=None)
 
   def set_items(self, text: list, right_text=None, icon=None, right_icon=None):
-    # TODO: 첫 번째 right_text가 None으로 설정되는 문제 해결
     if right_text is None or isinstance(right_text, str):
       right_text = itertools.repeat(right_text, len(text))
 

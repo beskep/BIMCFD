@@ -37,6 +37,7 @@ class IfcConverter:
   _default_openfoam_options = {
       'solver': 'simpleFoam',
       'flag_energy': True,
+      'flag_heat_flux': False,
       'flag_friction': False,
       'flag_interior_faces': False,
       'flag_external_zone': False,
@@ -278,6 +279,7 @@ class IfcConverter:
                                 opening_names=None,
                                 min_score=None,
                                 temperature=300,
+                                heat_flux=False,
                                 heat_transfer_coefficient=1e8) -> OrderedDict:
     """오픈폼 0/T에 입력하기 위한 boundaryField 항목을 생성
     벽 heat flux 해석이 가능한 경우 externalWallHeatFluxTemperature 설정
@@ -297,6 +299,9 @@ class IfcConverter:
         재료 매칭의 최소 점수 (0-100)
     temperature : float
         외부/벽체 온도 [K]
+    heat_flux : bool
+        벽체에 externalWallHeatFluxTemperature 적용 여부
+        True일 경우 가능하면 BIM에서 추출한 material layer의 열전도율/두께 적용
     heat_transfer_coefficient : float
         외부/벽 간 열전도율 [W/m^2/K]
 
@@ -328,22 +333,23 @@ class IfcConverter:
         surface, remove_na=False)
     assert len(surface) == len(names)
 
-    wall_heat_flux = OpenFoamCase.is_conductivity_available(solver)
+    flag_heat_flux = heat_flux and OpenFoamCase.is_conductivity_available(
+        solver)
     bfs = BoundaryFieldDict()
     width = 15
 
     # opening
     if opening_names:
-      opening_bf = OrderedDict([('type'.ljust(width), 'fixedValue'),
-                                ('value'.ljust(width), temperature)])
+      opening_bf = BoundaryFieldDict(width=width)
+      opening_bf.add_value('type', 'fixedValue')
+      opening_bf.add_value('value', 'uniform {}'.format(temperature))
       for op in opening_names:
         bfs[op] = opening_bf
         bfs.add_empty_line()
 
     # wall
     for idx, (srf, srf_name) in enumerate(zip(surface, surface_name)):
-      bf = BoundaryFieldDict()
-      bf.set_width(width)
+      bf = BoundaryFieldDict(width=width)
 
       if min_score:
         is_extracted = bool(conductivity[idx]) and all(
@@ -362,7 +368,7 @@ class IfcConverter:
       # global id
       bf.add_comment('Global id: "{}"'.format(srf.GlobalId))
 
-      # storey
+      # storey info
       storey = get_storey(srf)
       if storey is not None:
         bf.add_comment('Storey: "{}"'.format(storey.Name))
@@ -383,20 +389,20 @@ class IfcConverter:
           bf.add_empty_line()
 
       # boundary conditions
-      if wall_heat_flux and is_extracted:
+      if flag_heat_flux and is_extracted:
         bf.add_value('type', 'externalWallHeatFluxTemperature')
         bf.add_value('mode', 'coefficient')
-        bf.add_value('Ta', 'uniform ' + str(temperature))
-        bf.add_value('h', 'uniform ' + str(heat_transfer_coefficient))
+        bf.add_value('Ta', 'uniform {}'.format(temperature))
+        bf.add_value('h', 'uniform {}'.format(heat_transfer_coefficient))
         bf.add_value('thicknessLayers', to_openfoam_vector(thickness[idx]))
         bf.add_value('kappaLayers', to_openfoam_vector(conductivity[idx]))
         bf.add_value('kappaMethod', 'solidThermo')
       else:
-        if wall_heat_flux and not is_extracted:
+        if flag_heat_flux and not is_extracted:
           bf.add_comment('Material information not specified')
-
         bf.add_value('type', 'fixedValue')
-        bf.add_value('value', temperature)
+
+      bf.add_value('value', 'uniform {}'.format(temperature))
 
       bfs[srf_name] = bf
       bfs.add_empty_line()
@@ -414,7 +420,7 @@ class IfcConverter:
     """오픈폼 0/nut에 입력하기 위한 boundaryField 항목 생성
     난류 해석이 가능한 경우 nutURoughWallFunction 설정
     https://www.openfoam.com/documentation/guides/latest/api/classFoam_1_1nutURoughWallFunctionFvPatchScalarField.html
-    
+
     Parameters
     ----------
     solver : str
@@ -473,8 +479,7 @@ class IfcConverter:
 
     # wall
     for idx, (srf, srf_name) in enumerate(zip(surface, surface_name)):
-      bf = BoundaryFieldDict()
-      bf.set_width(width)
+      bf = BoundaryFieldDict(width=width)
 
       # surface name
       bf.add_comment('Surface name: "{}"'.format(srf.Name))
@@ -623,8 +628,7 @@ class IfcConverter:
                             min_cell_size=None,
                             boundary_cell_size=None,
                             boundary_layers_args: dict = None):
-    mesh_dict = BoundaryFieldDict()
-    mesh_dict.set_width(27)
+    mesh_dict = BoundaryFieldDict(width=27)
 
     mesh_dict.add_comment('Path to the surface mesh')
     mesh_dict.add_value('surfaceFile', '"geometry.fms"')
@@ -714,7 +718,7 @@ class IfcConverter:
           builder_space.Add(space, solid)
         except RuntimeError as e:
           raise ValueError('Shape 변환 실패:\n{}\n{}\n{}'.format(
-              self.file_path, target, e))
+              self.file_path, target, e)) from e
 
       distance = [shapes_distance(shape, op, tol) for op in openings]
       openings = [
@@ -804,7 +808,7 @@ class IfcConverter:
                                     buffer_size=5.0)
         fused = fuse_compound(simplified)
       except RuntimeError as e:
-        self._logger.error('단순화 실패:\n{}'.format(e))
+        self._logger.error('단순화 실패:\n%s', e)
         simplified = None
         fused = None
 
@@ -823,13 +827,13 @@ class IfcConverter:
                                     linear_deflection=self.brep_deflection[0],
                                     angular_deflection=self.brep_deflection[1])
       except (IOError, RuntimeError) as e:
-        self._logger.error('stl 저장 실패:\n{}'.format(e))
+        self._logger.error('stl 저장 실패:\n%s', e)
 
       try:
         DataExchange.write_step_file(a_shape=simplified,
                                      filename=save_path + '.stp')
       except (IOError, RuntimeError) as e:
-        self._logger.error('stp 저장 실패:\n{}'.format(e))
+        self._logger.error('stp 저장 실패:\n%s', e)
 
       try:
         write_obj(compound=simplified,
@@ -852,7 +856,7 @@ class IfcConverter:
                                 extract_opening_volume=opening_volume)
         valid_walls = [walls[wall_names.index(x)] for x in valid_names]
       except RuntimeError as e:
-        self._logger.error('obj 저장 실패:\n{}'.format(e))
+        self._logger.error('obj 저장 실패:\n%s', e)
 
     info_original_geom = geometric_features(shape)
     if simplified is None:
@@ -923,13 +927,13 @@ class IfcConverter:
                                     linear_deflection=self.brep_deflection[0],
                                     angular_deflection=self.brep_deflection[1])
     except (IOError, RuntimeError) as e:
-      self._logger.error('stl 저장 실패:\n{}'.format(e))
+      self._logger.error('stl 저장 실패:\n%s', e)
 
     try:
       DataExchange.write_step_file(a_shape=shape,
                                    filename=os.path.join(path, 'geometry.stp'))
     except (IOError, RuntimeError) as e:
-      self._logger.error('stp 저장 실패:\n{}'.format(e))
+      self._logger.error('stp 저장 실패:\n%s', e)
 
     try:
       extract_opening_volume = simplified['info']['simplification'][
@@ -953,7 +957,7 @@ class IfcConverter:
                 extract_interior=False,
                 extract_opening_volume=extract_opening_volume)
     except RuntimeError as e:
-      self._logger.error('obj 저장 실패:\n{}'.format(e))
+      self._logger.error('obj 저장 실패:\n%s', e)
 
     return
 
@@ -987,14 +991,13 @@ class IfcConverter:
 
     missing = [x for x in self.default_openfoam_options if x not in opt]
     if missing:
-      msg = '다음 옵션에 기본값 적용: {}'.format(missing)
-      self._logger.info(msg)
+      self._logger.info('다음 옵션에 기본값 적용: %s', missing)
     for key in missing:
       opt[key] = self.default_openfoam_options[key]
 
     unused = [x for x in opt if x not in self.default_openfoam_options]
     if unused:
-      self._logger.warning('적용되지 않는 OpenFOAM 옵션들: {}'.format(unused))
+      self._logger.warning('적용되지 않는 OpenFOAM 옵션들: %s', unused)
 
     solver = opt['solver']
     if not OpenFoamCase.is_supported_solver(solver):
@@ -1014,8 +1017,8 @@ class IfcConverter:
       else:
         shape = simplified['original']
 
-      zone, zone_faces = make_external_zone(
-          shape, buffer_size=opt['external_zone_size'])
+      _, zone_faces = make_external_zone(shape,
+                                         buffer_size=opt['external_zone_size'])
 
       write_obj(compound=shape,
                 space=simplified['space'],

@@ -13,9 +13,7 @@ from kivymd.uix.datatables import MDDataTable
 from kivymd.uix.filemanager import MDFileManager
 from kivymd.uix.snackbar import Snackbar
 from kivymd.uix.spinner import MDSpinner
-from kivymd.uix.textfield import MDTextField
 
-from interface.widgets import topo_widget as topo
 from interface.widgets.cfd_setting import CfdSettingDialog
 from interface.widgets.drop_down import DropDownMenu
 from interface.widgets.panel_title import PanelTitle
@@ -57,6 +55,9 @@ class BimCfdWidget(MDBoxLayout):
 class BimCfdAppBase(MDApp):
 
   def __init__(self, **kwargs):
+    self.root = None
+    self.built = None
+
     super().__init__(**kwargs)
 
     self._logger = logging.getLogger(self.__class__.__name__)
@@ -296,6 +297,7 @@ class BimCfdAppBase(MDApp):
         'flag_preserve_openings',
         'flag_opening_volume',
         'flag_internal_faces',
+        'flag_external_zone',
     ]
     numerical_options = [
         'precision',
@@ -332,6 +334,41 @@ class BimCfdAppBase(MDApp):
       res[option] = value
 
     return res
+
+  def get_openfoam_options(self):
+    solver = self.solver_menu.selected_item_text()
+    flag_external_zone = self.get_simplification_options()['flag_external_zone']
+    dialog_opt = self.cfd_dialog.options
+
+    ofopt = {
+        'solver': solver,
+        'flag_external_zone': flag_external_zone,
+        'flag_heat_flux': dialog_opt['flag_heat_flux'],
+        'flag_friction': dialog_opt['flag_friction'],
+        'external_temperature': dialog_opt['text_external_temperature'],
+        'heat_transfer_coefficient': dialog_opt['text_external_htc'],
+        'external_zone_size': dialog_opt['text_external_size']
+    }
+
+    if dialog_opt['flag_mesh_resolution']:
+      ofopt['grid_resolution'] = dialog_opt['text_mesh_resolution']
+    elif dialog_opt['flag_mesh_size']:
+      ofopt['max_cell_size'] = dialog_opt['text_mesh_size']
+    else:
+      raise ValueError
+
+    for of_key, dialog_key in zip(
+        ['min_cell_size', 'boundary_cell_size', 'heat_transfer_coefficient'],
+        ['text_mesh_min_size', 'text_boundary_cell_size', 'text_external_htc']):
+      if dialog_opt[dialog_key]:
+        ofopt[of_key] = dialog_opt[dialog_key]
+
+    if dialog_opt['text_boundary_layers_count']:
+      ofopt['boundary_layers'] = {
+          'nLayers': dialog_opt['text_boundary_layers_count']
+      }
+
+    return ofopt
 
   def show_snackbar(self, message, duration=None):
     self._snackbar.text = message
