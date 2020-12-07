@@ -1,7 +1,7 @@
 import os
 
-from kivy.lang.builder import Builder
 from kivy.core.text import LabelBase
+from kivy.lang.builder import Builder
 
 
 def load_kv(path, encoding='UTF-8'):

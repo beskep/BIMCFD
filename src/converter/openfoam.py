@@ -1,16 +1,16 @@
+import logging
 import os
-from collections import namedtuple, OrderedDict
-from shutil import rmtree, copy2
-from typing import Tuple, List
-from warnings import warn
+from collections import OrderedDict, namedtuple
+from itertools import chain
+from pathlib import Path
+from shutil import copy2, rmtree
+from typing import List, Tuple
+
+from utils import TEMPLATE_DIR
 
 from butterfly.case import Case as ButterflyCase
-from butterfly.fields import Field
 from butterfly.foamfile import FoamFile
-from butterfly.geometry import bf_geometry_from_stl_file
-from butterfly.refinementRegion import refinementRegions_from_stl_file
 from butterfly.version import Header
-from utils import TEMPLATE_DIR
 
 _DEFAULT_HEADER = \
     r'''/*--------------------------------*- C++ -*----------------------------------*\
@@ -64,7 +64,7 @@ def supported_solvers(energy=False,
   return solvers
 
 
-def list_files(folder, fullpath=False):
+def iter_files(folder, fullpath=False):
   """list files in a folder."""
   if not os.path.isdir(folder):
     yield None
@@ -84,7 +84,7 @@ def load_case_files(folder, fullpath=False):
   files = []
   for p in ('0', 'constant', 'system'):
     fp = os.path.join(folder, p)
-    files.append(tuple(list_files(fp, fullpath)))
+    files.append(tuple(iter_files(fp, fullpath)))
 
   Files = namedtuple('Files', 'zero constant system')
   return Files(*files)
@@ -111,7 +111,7 @@ class BoundaryFieldDict(OrderedDict):
   """
 
   def __init__(self, *args, **kwargs):
-    super(OrderedDict, self).__init__(*args, **kwargs)
+    super().__init__(*args, **kwargs)
     self.__key = ' '
     self._width = None
 
@@ -143,6 +143,8 @@ class BoundaryFieldDict(OrderedDict):
 
 
 class OpenFoamCase(ButterflyCase):
+  logger = logging.getLogger(Path(__file__).stem)
+
   SUBFOLDERS = ('0', 'constant', 'constant\\polyMesh', 'system')
 
   # minimum list of files to be able to run blockMesh and snappyHexMesh
@@ -182,6 +184,15 @@ class OpenFoamCase(ButterflyCase):
     if os.path.exists(path):
       self._original_dir = path
 
+  def load_mesh(self):
+    pass
+
+  def load_points(self):
+    pass
+
+  def update_bc_in_zero_folder(self):
+    pass
+
   @staticmethod
   def is_energy_available(solver: str):
     return solver.lower() in [x.lower() for x in _SOLVERS_ENERGY]
@@ -215,76 +226,36 @@ class OpenFoamCase(ButterflyCase):
     # convert files to butterfly objects
     ff = []
     flag_header = True
-    for f in (_files.zero, _files.constant, _files.system):
-      for p in f:
-        if not p:
-          continue
+    for p in chain.from_iterable([_files.zero, _files.constant, _files.system]):
+      if not p:
+        continue
 
-        if flag_header:
-          header = read_foam_file_header(p)
-          if header is not None:
-            Header.set_header(header)
-            flag_header = False
+      if flag_header:
+        header = read_foam_file_header(p)
+        if header is not None:
+          Header.set_header(header)
+          flag_header = False
 
-        try:
-          if str(p) == 'controlDict':
-            print()
-          foam_file = cls._Case__create_foamfile_from_file(
-              p, 1.0 / convert_from_meters)
+      try:
+        foam_file = cls._Case__create_foamfile_from_file(
+            p, 1.0 / convert_from_meters)
 
-          if foam_file:
-            ff.append(foam_file)
+        if foam_file:
+          ff.append(foam_file)
 
-          print('Imported {} from case.'.format(p))
+        cls.logger.debug(f'Imported {p} from case')
 
-        except Exception as e:
-          print('Failed to import {}:\n\t{}'.format(p, e))
+      except Exception as e:
+        cls.logger.error(f'Failed to import {p}:\n\t{e}')
+        raise e
 
-    s_hmd = cls._Case__get_foam_file_by_name('snappyHexMeshDict', ff)
-
-    if s_hmd:
-      s_hmd.project_name = name
-
-      stlfiles = tuple(f for f in _files.stl if f.lower().endswith('.stl'))
-
-      bf_geometries = tuple(
-          geo for f in stlfiles
-          for geo in bf_geometry_from_stl_file(f, convert_from_meters)
-          if os.path.split(f)[-1][:-4] in s_hmd.stl_file_names)
-
-    else:
-      bf_geometries = []
+    bf_geometries = []
 
     _case = cls(name=name,
                 working_dir=working_dir,
                 foamfiles=ff,
                 geometries=bf_geometries)
     _case.original_dir = path
-
-    # update each field of boundary condition for geometries
-    if s_hmd:
-      for ff in _case.get_foam_files_from_location('0'):
-        for geo in _case.geometries:
-          try:
-            f = ff.get_boundary_field(geo.name)
-          except AttributeError as e:
-            if not geo.name.endswith('Conditions'):
-              print(str(e))
-          else:
-            # set boundary condition for the field
-            if not f:
-              setattr(geo.boundary_condition, ff.name, None)
-            else:
-              setattr(geo.boundary_condition, ff.name, Field.from_dict(f))
-
-    if s_hmd:
-      refinementRegions = tuple(
-          ref for f in _files.stl
-          if os.path.split(f)[-1][:-4] in s_hmd.refinementRegion_names
-          for ref in refinementRegions_from_stl_file(
-              f, s_hmd.refinementRegion_mode(os.path.split(f)[-1][:-4])))
-
-      _case.add_refinementRegions(refinementRegions)
 
     # original name is a variable to address the current limitation to change
     # the name of stl file in snappyHexMeshDict. It will be removed once the
@@ -334,9 +305,9 @@ class OpenFoamCase(ButterflyCase):
           msg = 'Failed to create foam file {}\n\t{}'.format(p, e)
 
           if str(e).startswith('[Error 183]'):
-            warn(msg)
+            self.logger.warning(msg)
           else:
-            raise IOError(msg)
+            raise IOError(msg) from e
 
     # save foamfiles
     if minimum:

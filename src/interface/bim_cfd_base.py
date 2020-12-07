@@ -57,7 +57,7 @@ class BimCfdWidget(MDBoxLayout):
 class BimCfdAppBase(MDApp):
 
   def __init__(self, **kwargs):
-    super(BimCfdAppBase, self).__init__(**kwargs)
+    super().__init__(**kwargs)
 
     self._logger = logging.getLogger(self.__class__.__name__)
 
@@ -110,7 +110,7 @@ class BimCfdAppBase(MDApp):
     self.built = True
 
   def on_start(self):
-    super(BimCfdAppBase, self).on_start()
+    super().on_start()
 
     gap = dp(10)
     self._snackbar.snackbar_x = gap

@@ -29,7 +29,7 @@ class RightContentCls(RightContent):
 
   def __init__(self, *args, **kwargs):
     self.load_kv()
-    super(RightContentCls, self).__init__(*args, **kwargs)
+    super().__init__(*args, **kwargs)
 
   @classmethod
   def load_kv(cls):
@@ -45,7 +45,7 @@ class DropDownMenu(MDBoxLayout):
   width_mult = NumericProperty(1)
 
   def __init__(self, *args, **kwargs):
-    super(DropDownMenu, self).__init__(*args, **kwargs)
+    super().__init__(*args, **kwargs)
 
     self._button = MDDropDownItem()
     self._button.size_hint_x = 1
@@ -160,7 +160,6 @@ def make_drop_down_item(text, right_text=None, icon=None, right_icon=None):
 
 
 if __name__ == "__main__":
-  from kivy.lang import Builder
   from kivymd.app import MDApp
 
   kv = '''

@@ -15,7 +15,7 @@ class TextFieldFont(MDTextField):
 class TextFieldPath(TextFieldFont):
 
   def __init__(self, *args, **kwargs):
-    super(TextFieldPath, self).__init__(*args, **kwargs)
+    super().__init__(*args, **kwargs)
     self.helper_text_mode = 'on_error'
 
   def on_text(self, instance, text):
@@ -26,13 +26,13 @@ class TextFieldPath(TextFieldFont):
     else:
       self.error = False
 
-    super(TextFieldPath, self).on_text(instance, text)
+    super().on_text(instance, text)
 
 
 class TextFieldNumeric(TextFieldFont):
 
   def __init__(self, *args, **kwargs):
-    super(TextFieldNumeric, self).__init__(*args, **kwargs)
+    super().__init__(*args, **kwargs)
     self.helper_text_mode = 'on_error'
 
   def on_text(self, instance, text: str):
@@ -42,7 +42,7 @@ class TextFieldNumeric(TextFieldFont):
     else:
       self.error = False
 
-    super(TextFieldNumeric, self).on_text(instance, text)
+    super().on_text(instance, text)
 
 
 class TextFieldUnit(MDBoxLayout):
@@ -55,7 +55,7 @@ class TextFieldUnit(MDBoxLayout):
   unit_text = ObjectProperty('')
 
   def __init__(self, **kwargs):
-    super(TextFieldUnit, self).__init__(**kwargs)
+    super().__init__(**kwargs)
 
     self._main_text = TextFieldNumeric()
     self._main_text.size_hint_x = 0.75

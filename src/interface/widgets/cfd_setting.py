@@ -16,7 +16,7 @@ class CheckOnlyBox(MDCheckbox):
 
   def on_touch_down(self, touch):
     if self.state == 'normal':
-      return super(CheckOnlyBox, self).on_touch_down(touch)
+      return super().on_touch_down(touch)
 
 
 class CfdSettingContent(MDBoxLayout):
@@ -123,7 +123,7 @@ class CfdSettingContent(MDBoxLayout):
 
   def __init__(self, *args, **kwargs):
     self.load_kv()
-    super(CfdSettingContent, self).__init__(*args, **kwargs)
+    super().__init__(*args, **kwargs)
 
   @classmethod
   def load_kv(cls):
@@ -162,7 +162,7 @@ class CfdSettingDialog(MDDialog):
     kwargs['content_cls'] = content
     kwargs['buttons'] = [cancel_button, set_button]
 
-    super(CfdSettingDialog, self).__init__(title=title, **kwargs)
+    super().__init__(title=title, **kwargs)
 
     self._options = None
     # todo: 모델 특성길이에 따라 해상도 변경

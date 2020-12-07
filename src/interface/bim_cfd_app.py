@@ -38,7 +38,7 @@ class IfcEntityText:
 class BimCfdApp(BimCfdAppBase):
 
   def __init__(self, **kwargs):
-    super(BimCfdApp, self).__init__(**kwargs)
+    super().__init__(**kwargs)
 
     self._converter: ifccnv.IfcConverter = None
     self._spaces: list = None
@@ -47,12 +47,12 @@ class BimCfdApp(BimCfdAppBase):
     self._simplified: dict = None
 
   def on_start(self):
-    super(BimCfdApp, self).on_start()
+    super().on_start()
 
     self.solver_menu.set_items(text=openfoam.supported_solvers())
 
   def select_path(self, path):
-    super(BimCfdApp, self).select_path(path)
+    super().select_path(path)
 
     path = Path(path)
     if self.file_manager.mode == 'bim' and path.suffix.lower() == '.ifc':
@@ -226,7 +226,11 @@ class BimCfdApp(BimCfdAppBase):
 
     # solver = self.solver_menu.selected_item_text()
     # ofoptions = {'solver': solver}
-    ofoptions = None
+    ofoptions = {
+        'solver': 'simpleFoam',
+        'flag_friction': False,
+        'grid_resolution': 8
+    }
 
     # TODO: internal face 설정 적용
     # TODO: external zone 설정 적용

@@ -9,7 +9,6 @@ from kivy.graphics.transformation import Matrix
 from kivy.resources import resource_find
 from kivy.uix.widget import Widget
 
-from interface.utf_app import UtfApp
 from interface.widgets.topo_mesh import TopoDsMesh
 
 _GLSL_PATH = RESOURCE_DIR.joinpath('color.glsl')
@@ -23,7 +22,7 @@ class BaseRenderer(Widget):
   SCALE_FACTOR = 2.0
 
   def __init__(self, **kwargs):
-    super(BaseRenderer, self).__init__(**kwargs)
+    super().__init__(**kwargs)
 
     self.canvas = graphics.RenderContext(compute_normal_mat=True)
     self.canvas.shader.source = resource_find(str(_GLSL_PATH))
@@ -143,7 +142,7 @@ class TopoRenderer(BaseRenderer):
   def __init__(self, shapes: List[TopoDsMesh] = None, **kwargs):
     self.save_shapes(shapes)
 
-    super(TopoRenderer, self).__init__(**kwargs)
+    super().__init__(**kwargs)
 
   def save_shapes(self, shapes: List[TopoDsMesh] = None):
     if shapes:
@@ -242,6 +241,7 @@ class TopoRenderer(BaseRenderer):
 
 if __name__ == "__main__":
   from OCC.Core.BRepPrimAPI import BRepPrimAPI_MakeBox, BRepPrimAPI_MakeCone
+  from kivymd.app import MDApp
 
   box = BRepPrimAPI_MakeBox(1.0, 1.0, 1.0).Shape()
   cone = BRepPrimAPI_MakeCone(1.2, 0.8, 0.5).Shape()
@@ -252,7 +252,7 @@ if __name__ == "__main__":
                          linear_deflection=0.1,
                          color=(1.0, 0.5, 1.0, 0.5))
 
-  class _RendererApp(UtfApp):
+  class _RendererApp(MDApp):
 
     def build(self):
       return TopoRenderer(shapes=[box_mesh, cone_mesh])

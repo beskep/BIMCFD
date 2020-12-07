@@ -15,7 +15,6 @@ FoamFile
 }
 // * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
 dimensions      [0 2 -2 0 0 0 0];
-
 internalField   uniform 0.001;
 
 boundaryField
@@ -23,13 +22,13 @@ boundaryField
     opening
     {
         type            fixedValue;
-        value           uniform $kInlet;
+        value           $internalField;
     }
 
     wall
     {
         type            kqRWallFunction;
-        value           uniform $kInlet;
+        value           $internalField;
     }
 }
 

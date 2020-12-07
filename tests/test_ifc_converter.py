@@ -1,16 +1,13 @@
 import os
-import sys
+
+import utils
 
 import ifcopenshell
 import ifcopenshell.geom
 import pytest
 
-SRC_DIR = os.path.abspath(os.path.join(__file__, '../../src'))
-assert os.path.exists(SRC_DIR)
-if SRC_DIR not in sys.path:
-  sys.path.append(SRC_DIR)
-
 from converter import ifc_converter, openfoam
+from converter.openfoam import OpenFoamCase
 
 ifc_path = r'D:\repo\IFC\DURAARK Datasets\Academic_Autodesk\Academic_Autodesk-AdvancedSampleProject_Arch.ifc'
 converter = ifc_converter.IfcConverter(ifc_path)
@@ -81,8 +78,9 @@ def test_simpl_and_temperature_info():
 
 
 def test_simplify():
-  from converter import simplify
   from pprint import pprint
+
+  from converter import simplify
 
   case_name = 'IfcConvert'
 
@@ -194,8 +192,9 @@ def test_openfoam_rough_wall_nut_dict():
 
 
 def test_openfoam_zero_boundary_field():
-  from converter.openfoam import OpenFoamCase
   from copy import deepcopy
+
+  from converter.openfoam import OpenFoamCase
 
   space = converter.ifc.by_id(3744)
   converter.threshold_surface_dist = 5.0
@@ -240,9 +239,10 @@ def test_openfoam_zero_boundary_field():
 
 
 def test_external_zone():
-  from converter.simplify import make_external_zone
+  from OCC.Core.TopoDS import TopoDS_Face, TopoDS_Shape
+
   from converter.obj_convert import write_obj
-  from OCC.Core.TopoDS import TopoDS_Shape, TopoDS_Face
+  from converter.simplify import make_external_zone
 
   space = converter.ifc.by_id(3744)
   converter.threshold_surface_dist = 5.0
@@ -294,5 +294,14 @@ def test_openfoam_option():
   pprint(options)
 
 
+def test_openfoam_case_from_template():
+  solver = 'simpleFoam'
+  save_dir = r'D:\test'
+  name = 'test_case'
+
+  OpenFoamCase.from_template(solver=solver, save_dir=save_dir, name=name)
+
+
 if __name__ == '__main__':
-  pytest.main(['-v', '-s', '-k', 'test_external_zone'])
+  test_openfoam_case_from_template()
+  # pytest.main(['-v', '-s', '-k', 'test_single_openfoam_case'])

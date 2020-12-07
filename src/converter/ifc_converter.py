@@ -37,7 +37,7 @@ class IfcConverter:
   _default_openfoam_options = {
       'solver': 'simpleFoam',
       'flag_energy': True,
-      'flag_friction': True,
+      'flag_friction': False,
       'flag_interior_faces': False,
       'flag_external_zone': False,
       'external_zone_size': 5.0,
@@ -168,7 +168,7 @@ class IfcConverter:
     """
     :return: defaultdict, {space: List[wall]}
     """
-    spaces_walls = defaultdict(lambda: set())
+    spaces_walls = defaultdict(set)
 
     walls = list(
         chain.from_iterable(
@@ -183,7 +183,7 @@ class IfcConverter:
 
   def get_storey_info(self):
     storeys = self._ifc.by_type('IfcBuildingStorey')
-    storeys_dict = defaultdict(lambda: set())
+    storeys_dict = defaultdict(set)
 
     for storey in storeys:
       for decom in storey.IsDecomposedBy:
@@ -495,7 +495,8 @@ class IfcConverter:
         bf.add_value('type', 'nutURoughWallFunction')
         bf.add_value('roughnessHeight', roughness[idx])
         bf.add_value('roughnessConstant', roughness_constant)
-        bf.add_value('roughnessFactor', roughness_factor)
+        bf.add_value('roughnessFactor',
+                     roughness_factor)  # fixme: semicolon 추가 안됨
       else:
         if turbulence and not is_extracted:
           bf.add_comment('Material not matched')
@@ -986,7 +987,10 @@ class IfcConverter:
 
     missing = [x for x in self.default_openfoam_options if x not in opt]
     if missing:
-      raise ValueError('Missing OpenFOAM conditions: {}'.format(missing))
+      msg = '다음 옵션에 기본값 적용: {}'.format(missing)
+      self._logger.info(msg)
+    for key in missing:
+      opt[key] = self.default_openfoam_options[key]
 
     unused = [x for x in opt if x not in self.default_openfoam_options]
     if unused:
@@ -1038,7 +1042,7 @@ class IfcConverter:
     if os.path.exists(geom_path):
       copy2(src=geom_path, dst=os.path.join(working_dir, 'geometry.obj'))
     else:
-      self._logger.warn('obj 추출에 실패했습니다.')
+      self._logger.warning('obj 추출에 실패했습니다.')
 
     # OpenFOAM 케이스 파일 생성
     open_foam_case = OpenFoamCase.from_template(solver=solver,

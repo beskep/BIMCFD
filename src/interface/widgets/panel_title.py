@@ -9,7 +9,7 @@ class PanelTitle(MDBoxLayout):
   text = StringProperty('')
 
   def __init__(self, **kwagrgs):
-    super(PanelTitle, self).__init__(**kwagrgs)
+    super().__init__(**kwagrgs)
 
     self._icon = MDIcon()
     self._icon.size_hint = None, None
