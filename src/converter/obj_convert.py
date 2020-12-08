@@ -18,7 +18,8 @@ from OCC.Extend.TopologyUtils import TopologyExplorer
 from OCCUtils.Common import GpropsFromShape
 from OCCUtils.Construct import compound
 
-from converter.simplify import face_info, get_boundingbox, shapes_distance
+from converter.geom_utils import get_boundingbox, shapes_distance
+from converter.simplify import face_info
 
 DEFAULT_BLENDER_PATH = r'C:\Program Files\Blender Foundation\Blender\blender'
 

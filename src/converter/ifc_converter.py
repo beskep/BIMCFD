@@ -1,4 +1,3 @@
-import json
 import logging
 import os
 from collections import OrderedDict, defaultdict
@@ -13,14 +12,12 @@ import ifcopenshell.geom
 from ifcopenshell import entity_instance as IfcEntity
 from OCC.Core.TopoDS import TopoDS_Builder, TopoDS_Compound, TopoDS_Shape
 from OCC.Extend import DataExchange
-from OCC.Extend.TopologyUtils import TopologyExplorer
 
+from converter import geom_utils
 from converter.material_match import MaterialMatch
 from converter.obj_convert import write_obj
 from converter.openfoam import BoundaryFieldDict, OpenFoamCase
-from converter.simplify import (compare_shapes, fuse_compound,
-                                geometric_features, make_external_zone,
-                                shapes_distance, simplify_space)
+from converter.simplify import simplify_space
 
 PATH_MATERIAL_LAYER = TEMPLATE_DIR.joinpath('material_layer.txt')
 PATH_TEMPERATURE = TEMPLATE_DIR.joinpath('temperature.txt')
@@ -145,7 +142,7 @@ class IfcConverter:
   @minimum_match_score.setter
   def minimum_match_score(self, value):
     value = int(value)
-    if value <= 0 or 100 < value:
+    if not (0 <= value < 100):
       raise ValueError('Score out of range')
     self._min_match_score = value
 
@@ -254,7 +251,7 @@ class IfcConverter:
       layer_info = layer_info_without_na
 
     unique_names = set(
-        [x[0].lower() for x in chain.from_iterable(layer_info_without_na)])
+        x[0].lower() for x in chain.from_iterable(layer_info_without_na))
     match_dict = {
         x: self.materiam_match.thermal_properties(x) for x in unique_names
     }
@@ -720,7 +717,7 @@ class IfcConverter:
           raise ValueError('Shape 변환 실패:\n{}\n{}\n{}'.format(
               self.file_path, target, e)) from e
 
-      distance = [shapes_distance(shape, op, tol) for op in openings]
+      distance = [geom_utils.shapes_distance(shape, op, tol) for op in openings]
       openings = [
           opening for opening, dist in zip(openings, distance)
           if dist is not None and dist < tol
@@ -735,8 +732,6 @@ class IfcConverter:
 
   def simplify_space(self,
                      spaces: Union[List[int], List[IfcEntity]],
-                     save_dir=None,
-                     case_name=None,
                      threshold_volume=None,
                      threshold_dist=None,
                      threshold_angle=None,
@@ -744,13 +739,6 @@ class IfcConverter:
                      relative_threshold=True,
                      preserve_opening=True,
                      opening_volume=True):
-    if save_dir:
-      if not os.path.exists(save_dir):
-        os.mkdir(save_dir)
-      save_path = os.path.join(save_dir, case_name)
-    else:
-      save_path = None
-
     shape, space, walls, openings = self.convert_space(spaces)
     wall_names = self.component_code(walls, 'W')
 
@@ -806,7 +794,7 @@ class IfcConverter:
                                     tol_bbox=self.tol_bbox,
                                     tol_cut=self.tol_cut,
                                     buffer_size=5.0)
-        fused = fuse_compound(simplified)
+        fused = geom_utils.fuse_compound(simplified)
       except RuntimeError as e:
         self._logger.error('단순화 실패:\n%s', e)
         simplified = None
@@ -814,60 +802,16 @@ class IfcConverter:
 
       is_simplified = (simplified is not None)
 
-    valid_names, valid_walls = None, None
-    if save_path and simplified is not None:
-      try:
-        DataExchange.write_stl_file(a_shape=simplified,
-                                    filename=save_path + '.stl',
-                                    linear_deflection=self.brep_deflection[0],
-                                    angular_deflection=self.brep_deflection[1])
-        compare = compare_shapes(shape, simplified)
-        DataExchange.write_stl_file(a_shape=compare,
-                                    filename=save_path + '_compare.stl',
-                                    linear_deflection=self.brep_deflection[0],
-                                    angular_deflection=self.brep_deflection[1])
-      except (IOError, RuntimeError) as e:
-        self._logger.error('stl 저장 실패:\n%s', e)
-
-      try:
-        DataExchange.write_step_file(a_shape=simplified,
-                                     filename=save_path + '.stp')
-      except (IOError, RuntimeError) as e:
-        self._logger.error('stp 저장 실패:\n%s', e)
-
-      try:
-        write_obj(compound=simplified,
-                  space=space,
-                  openings=openings,
-                  walls=wall_shapes,
-                  obj_path=(save_path + '_interior.obj'),
-                  deflection=self.brep_deflection,
-                  wall_names=wall_names,
-                  extract_interior=True,
-                  extract_opening_volume=opening_volume)
-        valid_names = write_obj(compound=simplified,
-                                space=space,
-                                openings=openings,
-                                walls=wall_shapes,
-                                obj_path=(save_path + '.obj'),
-                                deflection=self.brep_deflection,
-                                wall_names=wall_names,
-                                extract_interior=False,
-                                extract_opening_volume=opening_volume)
-        valid_walls = [walls[wall_names.index(x)] for x in valid_names]
-      except RuntimeError as e:
-        self._logger.error('obj 저장 실패:\n%s', e)
-
-    info_original_geom = geometric_features(shape)
+    info_original_geom = geom_utils.geometric_features(shape)
     if simplified is None:
       info_simplified_geom = None
     else:
-      info_simplified_geom = geometric_features(simplified)
+      info_simplified_geom = geom_utils.geometric_features(simplified)
 
     if fused is None:
       info_fused_geom = None
     else:
-      info_fused_geom = geometric_features(fused)
+      info_fused_geom = geom_utils.geometric_features(fused)
 
     info_simplification = {
         'threshold_volume': threshold_volume,
@@ -886,19 +830,14 @@ class IfcConverter:
         'fused_geometry': info_fused_geom
     }
 
-    if save_path:
-      info_json = json.dumps(info, indent=4)
-      with open(save_path + '_info.json', 'w') as f:
-        f.write(info_json)
-
     results = {
         'original': shape,
         'simplified': simplified,
         'fused': fused,
         'space': space,
-        'walls': walls if valid_walls is None else valid_walls,
+        'walls': walls,
         'wall_shapes': wall_shapes,
-        'wall_names': wall_names if valid_names is None else valid_names,
+        'wall_names': wall_names,
         'openings': openings,
         'opening_names': ['Opening_{}'.format(x) for x in range(len(openings))],
         'info': info
@@ -920,7 +859,7 @@ class IfcConverter:
                                   linear_deflection=self.brep_deflection[0],
                                   angular_deflection=self.brep_deflection[1])
       if is_simplified:
-        compare = compare_shapes(simplified['original'], shape)
+        compare = geom_utils.compare_shapes(simplified['original'], shape)
         DataExchange.write_stl_file(a_shape=compare,
                                     filename=os.path.join(
                                         path, 'geometry_compare.stl'),
@@ -1017,8 +956,8 @@ class IfcConverter:
       else:
         shape = simplified['original']
 
-      _, zone_faces = make_external_zone(shape,
-                                         buffer_size=opt['external_zone_size'])
+      _, zone_faces = geom_utils.make_external_zone(
+          shape, buffer_size=opt['external_zone_size'])
 
       write_obj(compound=shape,
                 space=simplified['space'],
@@ -1051,17 +990,6 @@ class IfcConverter:
     open_foam_case = OpenFoamCase.from_template(solver=solver,
                                                 save_dir=save_dir,
                                                 name=case_name)
-
-    # temperature = self.openfoam_temperature_info(
-    #     walls=simplify_result['walls'],
-    #     surface_names=simplify_result['wall_names'],
-    #     external_temperature=condition['external_temperature'],
-    #     heat_transfer_coefficient=condition['heat_transfer_coefficient'])
-
-    # temperature_path = os.path.join(save_dir, case_name, '0', 'T')
-    # assert os.path.exists(temperature_path)
-    # with open(temperature_path, 'w') as f:
-    #   f.writelines(temperature)
 
     wall_names = ['Surface_' + x for x in simplified['wall_names']]
     opening_names = simplified['opening_names']
@@ -1123,9 +1051,10 @@ class IfcConverter:
 
     def storey_id(x):
       if x is None:
-        return 0
+        res = 0
       else:
-        return x.GlobalId
+        res = x.GlobalId
+      return res
 
     entity_index = {storey_id(x): 1 for x in storeys}
     entity_len = {
@@ -1172,29 +1101,6 @@ def get_bounded_by(space: IfcEntity):
     boundaries = None
 
   return boundaries
-
-
-def write_each_shapes(shape: TopoDS_Compound, save_dir, mkdir=False):
-  """compound를 구성하는 각 shape을 저장
-
-  Parameters
-  ----------
-  shape : TopoDS_Compound
-      대상 compound
-  save_dir : PathLike
-      저장 위치
-  """
-  exp = TopologyExplorer(shape)
-  if exp.number_of_solids() <= 1:
-    raise ValueError('대상 shape에 solid가 없음')
-
-  if not os.path.exists(save_dir) and mkdir:
-    os.mkdir(save_dir)
-
-  solids = exp.solids()
-  for idx, solid in enumerate(solids):
-    path = os.path.join(save_dir, '{}.stl'.format(idx))
-    DataExchange.write_stl_file(a_shape=solid, filename=path)
 
 
 def entity_name(entity: IfcEntity) -> str:

@@ -33,6 +33,13 @@ class IfcEntityText:
 
 
 class BimCfdApp(BimCfdAppBase):
+  _geom_vars_kor = {
+      'volume': '부피 (m³)',
+      'area': '면적 (m²)',
+      'characteristic_length': '길이 (m)',
+      'face_count': '표면 개수',
+      'solid_count': None
+  }
 
   def __init__(self, **kwargs):
     super().__init__(**kwargs)
@@ -151,8 +158,6 @@ class BimCfdApp(BimCfdAppBase):
     # 단순화
     simplified = self._converter.simplify_space(
         spaces=space,
-        save_dir=None,
-        case_name=None,
         threshold_volume=options['vol_threshold'],
         threshold_dist=options['dist_threshold'],
         threshold_angle=options['angle_threshold'],
@@ -186,10 +191,11 @@ class BimCfdApp(BimCfdAppBase):
     # TODO: 표 다듬기
     geom_cols = [('변수', dp(50)), ('전처리 전', dp(50)), ('전처리 후', dp(50))]
     geom_orig: dict = simplified['info']['original_geometry']
-    geom_simp: dict = simplified['info']['simplified_geometry']
-
+    geom_simp: dict = simplified['info']['fused_geometry']
     if geom_simp is None:
-      geom_simp = dict()
+      geom_simp = simplified['info']['simplified_geometry']
+      if geom_simp is None:
+        geom_simp = dict()
 
     geom_vars = list(geom_orig.keys())
     geom_rows = [(x, geom_orig[x], geom_simp.get(x, 'NA')) for x in geom_vars]

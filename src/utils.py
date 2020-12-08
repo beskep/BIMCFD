@@ -15,6 +15,8 @@ else:
 RESOURCE_DIR = SRC_DIR.joinpath('resource')
 TEMPLATE_DIR = SRC_DIR.joinpath('template')
 
+# todo: logger setting
+
 _SRC_DIR = SRC_DIR.as_posix()
 if SRC_DIR not in sys.path:
   import logging
