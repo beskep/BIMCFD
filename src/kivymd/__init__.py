@@ -30,7 +30,7 @@ without asking too.
 
 import os
 
-from kivy.logger import Logger
+# from kivy.logger import Logger
 
 __version__ = "0.104.2.dev0"
 """KivyMD version."""
@@ -38,9 +38,9 @@ __version__ = "0.104.2.dev0"
 release = False
 
 try:
-    from kivymd._version import __date__, __hash__, __short_hash__
+  from kivymd._version import __date__, __hash__, __short_hash__
 except ImportError:
-    __hash__ = __short_hash__ = __date__ = ""
+  __hash__ = __short_hash__ = __date__ = ""
 
 path = os.path.dirname(__file__)
 """Path to KivyMD package directory."""
@@ -51,15 +51,12 @@ fonts_path = os.path.join(path, f"fonts{os.sep}")
 images_path = os.path.join(path, f"images{os.sep}")
 """Path to images directory."""
 
-_log_message = (
-    "KivyMD:"
-    + (" Release" if release else "")
-    + f" {__version__}"
-    + (f", git-{__short_hash__}" if __short_hash__ else "")
-    + (f", {__date__}" if __date__ else "")
-    + f' (installed at "{__file__}")'
-)
-Logger.info(_log_message)
+# _log_message = ("KivyMD:" + (" Release" if release else "") +
+#                 f" {__version__}" +
+#                 (f", git-{__short_hash__}" if __short_hash__ else "") +
+#                 (f", {__date__}" if __date__ else "") +
+#                 f' (installed at "{__file__}")')
+# Logger.info(_log_message)
 
 import kivymd.factory_registers  # NOQA
 import kivymd.font_definitions  # NOQA

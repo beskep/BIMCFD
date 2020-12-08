@@ -24,8 +24,8 @@ class CfdSettingContent(MDBoxLayout):
   kv = '''
 <CfdSettingContent>
   orientation: 'vertical'
-  height: dp(360)
-  # size_hint_y: 1
+  # height: dp(360)
+  height: dp(400)
 
   SpacingBox:
     orientation: 'vertical'
@@ -53,7 +53,7 @@ class CfdSettingContent(MDBoxLayout):
     SpacingBox:
       TextFieldUnit:
         hint_text: '외부 온도'
-        text: '300'
+        text: '293.15'
         unit: 'K'
         id: text_external_temperature
 
@@ -111,14 +111,21 @@ class CfdSettingContent(MDBoxLayout):
 
     SpacingBox:
       TextFieldUnit:
+        hint_text: 'No. of Boundary Layers'
+        text: '0'
+        id: text_boundary_layers_count
+      TextFieldUnit:
         hint_text: 'Boundary Cell Size'
         text: '0'
         unit: 'm'
         id: text_boundary_cell_size
+
+    SpacingBox:
       TextFieldUnit:
-        hint_text: 'No. of Boundary Layers'
-        text: '0'
-        id: text_boundary_layers_count
+        hint_text: 'No. of subdomains'
+        text: '6'  # fixme: TTA
+        id: text_num_of_subdomains
+      MDBoxLayout:
   '''
 
   def __init__(self, *args, **kwargs):
@@ -146,6 +153,7 @@ class CfdSettingDialog(MDDialog):
       'text_external_size',
       'text_boundary_cell_size',
       'text_boundary_layers_count',
+      'text_num_of_subdomains',
   )
 
   def __init__(self, title='CFD 세부 설정', **kwargs):

@@ -27,6 +27,17 @@ boundaryField
         p0              $internalField;
     }
 
+    inlet
+    {
+        type            fixedFluxPressure;
+    }
+
+    opening
+    {
+        type            fixedValue;
+        value           $internalField;
+    }
+
     wall
     {
         type            fixedFluxPressure;

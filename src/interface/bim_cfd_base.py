@@ -60,7 +60,7 @@ class BimCfdAppBase(MDApp):
 
     super().__init__(**kwargs)
 
-    self._logger = logging.getLogger(self.__class__.__name__)
+    self._logger = logging.getLogger('BIMCFD')
 
     # GUI setting
     self.theme_cls.theme_style = 'Light'
@@ -357,11 +357,15 @@ class BimCfdAppBase(MDApp):
     else:
       raise ValueError
 
-    for of_key, dialog_key in zip(
-        ['min_cell_size', 'boundary_cell_size', 'heat_transfer_coefficient'],
-        ['text_mesh_min_size', 'text_boundary_cell_size', 'text_external_htc']):
-      if dialog_opt[dialog_key]:
-        ofopt[of_key] = dialog_opt[dialog_key]
+    keys = {
+        'text_mesh_min_size': 'min_cell_size',
+        'text_boundary_cell_size': 'boundary_cell_size',
+        'text_external_htc': 'heat_transfer_coefficient',
+        'text_num_of_subdomains': 'num_of_subdomains',
+    }
+    for dkey, okey in keys.items():
+      if dialog_opt[dkey]:
+        ofopt[okey] = dialog_opt[dkey]
 
     if dialog_opt['text_boundary_layers_count']:
       ofopt['boundary_layers'] = {
@@ -382,6 +386,8 @@ class BimCfdAppBase(MDApp):
       # 이미 보이는 (animation 중인) snackbar가 존재함
       # 이번 요청은 무시
       pass
+
+    self._logger.info('Snackbar: %s', message)
 
   @mainthread
   def activate_spinner(self, active=True):

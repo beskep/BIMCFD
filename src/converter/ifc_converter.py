@@ -5,18 +5,17 @@ from itertools import chain, combinations
 from shutil import copy2
 from typing import Iterable, List, Tuple, Union
 
-from utils import TEMPLATE_DIR
+from utils import TEMPLATE_DIR, TTA
 
 import ifcopenshell
 import ifcopenshell.geom
 from ifcopenshell import entity_instance as IfcEntity
 from OCC.Core.TopoDS import TopoDS_Builder, TopoDS_Compound, TopoDS_Shape
 from OCC.Extend import DataExchange
-from OCC.Extend.TopologyUtils import TopologyExplorer
 
 from converter import geom_utils
 from converter.material_match import MaterialMatch
-from converter.obj_convert import write_obj
+from converter.obj_convert import ObjConverter, write_obj
 from converter.openfoam import BoundaryFieldDict, OpenFoamCase
 from converter.simplify import simplify_space
 
@@ -55,7 +54,7 @@ class IfcConverter:
                wall_types=('IfcWall',),
                slab_types=('IfcSlab',),
                covering_types=('IfcCovering',)):
-    self._logger = logging.getLogger(self.__class__.__name__)
+    self._logger = logging.getLogger('BIMCFD')
 
     self._file_path = os.path.normpath(path)
     self._ifc = ifcopenshell.open(self._file_path)
@@ -271,6 +270,41 @@ class IfcConverter:
 
     return name, thickness, matched_name, conductivity, score
 
+  def openfoam_u_dict(self, surface_names, opening_names):
+    """#fixme: TTA"""
+    if not TTA:
+      raise SyntaxError
+
+    assert 'Opening_0' in opening_names
+    assert 'Opening_1' in opening_names
+
+    bfs = BoundaryFieldDict()
+    width = 15
+
+    # opening_1 (inlet)
+    bf_inlet = BoundaryFieldDict(width=width)
+    bf_inlet.add_value('type', 'fixedValue')
+    bf_inlet.add_value('value', 'uniform (0 3 0)')
+    bfs['Opening_1'] = bf_inlet
+    bfs.add_empty_line()
+
+    # opening_0 (outlet)
+    bf_outlet = BoundaryFieldDict(width=width)
+    bf_outlet.add_value('type', 'inletOutlet')
+    bf_outlet.add_value('inletValue', 'uniform (0 0 0)')
+    bf_outlet.add_value('value', 'uniform (0 0 0)')
+    bfs['Opening_0'] = bf_outlet
+    bfs.add_empty_line()
+
+    # walls
+    bf_wall = BoundaryFieldDict(width=width)
+    bf_wall.add_value('type', 'noSlip')
+    for name in surface_names:
+      bfs[name] = bf_wall
+    bfs.add_empty_line()
+
+    return bfs
+
   def openfoam_temperature_dict(self,
                                 solver,
                                 surface,
@@ -386,6 +420,16 @@ class IfcConverter:
           for mat_idx, name in enumerate(matched_names[idx]):
             bf.add_comment('Material {}: "{}"'.format(mat_idx + 1, name))
           bf.add_empty_line()
+
+      # fixme: TTA
+      if TTA and 'F02S1' in srf_name:
+        bf.add_value('type', 'wallHeatTransfer')
+        bf.add_value('Tinf', 'uniform 303.15')
+        bf.add_value('alphaWall', 'uniform 1.4')
+        bf.add_value('value', 'uniform 303.15')
+        bfs[srf_name] = bf
+        bfs.add_empty_line()
+        continue
 
       # boundary conditions
       if flag_heat_flux and is_extracted:
@@ -516,10 +560,20 @@ class IfcConverter:
 
   @staticmethod
   def openfoam_zero_boundary_field(case: OpenFoamCase,
-                                   wall_names,
-                                   opening_names,
+                                   wall_names: list,
+                                   opening_names=None,
+                                   inlet_names=None,
+                                   outlet_names=None,
                                    target_fields: list = None,
                                    drop_fields: list = None):
+    """수동 생성 안한 나머지 field 설정"""
+    if opening_names is None:
+      opening_names = []
+    if inlet_names is None:
+      inlet_names = []
+    if outlet_names is None:
+      outlet_names = []
+
     ffs = [x for x in case.foam_files if x.location == '"0"']
 
     if target_fields:
@@ -544,10 +598,21 @@ class IfcConverter:
       opening_field = bf_template['opening']
       wall_field = bf_template['wall']
 
+      inlet_field = bf_template.get('inlet', opening_field)
+      outlet_field = bf_template.get('outlet', opening_field)
+
       bf = BoundaryFieldDict()
 
       for opening in opening_names:
         bf[opening] = opening_field
+        bf.add_empty_line()
+
+      for inlet in inlet_names:
+        bf[inlet] = inlet_field
+        bf.add_empty_line()
+
+      for outlet in outlet_names:
+        bf[outlet] = outlet_field
         bf.add_empty_line()
 
       for wall in wall_names:
@@ -828,6 +893,23 @@ class IfcConverter:
       for key in info_keys:
         info[key] = info['original_geometry']
 
+    # todo: valid wall names를 찾는 함수 obj_convert에 만들기
+    objcnv = ObjConverter(compound=(simplified if is_simplified else shape),
+                          space=space,
+                          openings=openings,
+                          walls=wall_shapes,
+                          wall_names=wall_names)
+    objcnv.classify_compound()
+    objcnv.classify_opening(opening_volume=True)
+    objcnv.classify_walls()
+    valid_wall_names = objcnv.valid_surfaces()
+    if valid_wall_names:
+      indices = [i for i, x in enumerate(wall_names) if x in valid_wall_names]
+      assert indices, 'no valid wall indices'
+      walls = [walls[x] for x in indices]
+      wall_names = [wall_names[x] for x in indices]
+      wall_shapes = [wall_shapes[x] for x in indices]
+
     results = {
         'original': shape,
         'simplified': simplified,
@@ -997,6 +1079,7 @@ class IfcConverter:
     wall_names = ['Surface_' + x for x in simplified['wall_names']]
     opening_names = simplified['opening_names']
 
+    drop_fields = []
     if OpenFoamCase.is_energy_available(solver) and opt['flag_energy']:
       bf_t = self.openfoam_temperature_dict(
           solver=solver,
@@ -1007,6 +1090,7 @@ class IfcConverter:
           temperature=opt.get('external_temperature', 300),
           heat_transfer_coefficient=opt.get('heat_transfer_coefficient', '1e8'))
       open_foam_case.change_boundary_field(variable='T', boundary_field=bf_t)
+      drop_fields.append('T')
 
     if OpenFoamCase.is_turbulence_available(solver) and opt['flag_friction']:
       bf_nut = self.openfoam_rough_wall_nut_dict(
@@ -1017,11 +1101,27 @@ class IfcConverter:
           min_score=self.minimum_match_score)
       open_foam_case.change_boundary_field(variable='nut',
                                            boundary_field=bf_nut)
+      drop_fields.append('nut')
 
-    self.openfoam_zero_boundary_field(case=open_foam_case,
-                                      wall_names=wall_names,
-                                      opening_names=opening_names,
-                                      drop_fields=['T', 'nut'])
+    if TTA:
+      # fixme: TTA
+      bf_u = self.openfoam_u_dict(surface_names=wall_names,
+                                  opening_names=opening_names)
+      open_foam_case.change_boundary_field(variable='U', boundary_field=bf_u)
+      drop_fields.append('U')
+
+    if TTA:
+      self.openfoam_zero_boundary_field(case=open_foam_case,
+                                        wall_names=wall_names,
+                                        opening_names=None,
+                                        inlet_names=['Opening_1'],
+                                        outlet_names=['Opening_0'],
+                                        drop_fields=drop_fields)
+    else:
+      self.openfoam_zero_boundary_field(case=open_foam_case,
+                                        wall_names=wall_names,
+                                        opening_names=opening_names,
+                                        drop_fields=drop_fields)
 
     if opt.get('max_cell_size', None):
       max_cell_size = opt['max_cell_size']
@@ -1029,6 +1129,10 @@ class IfcConverter:
       geom_info = simplified['info'][('fused_geometry' if is_simplified else
                                       'original_geometry')]
       max_cell_size = geom_info['characteristic_length'] / opt['grid_resolution']
+
+      if TTA:
+        # todo: TTA용 수정
+        max_cell_size = 1.5 * max_cell_size
 
     mesh_dict = self.openfoam_cf_mesh_dict(
         max_cell_size=max_cell_size,

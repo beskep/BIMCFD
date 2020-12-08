@@ -5,7 +5,6 @@ from collections import defaultdict
 from itertools import chain
 from tempfile import TemporaryDirectory
 from typing import Collection, Iterable, Union
-from warnings import warn
 
 import utils
 
@@ -163,7 +162,8 @@ class ObjConverter:
         if opening_volume:
           # opening의 부피를 추출
           if len(faces) != 6:
-            warn('Opening이 직육면체 모양이 아닙니다. 추출에 오류가 발생할 수 있습니다.')
+            msg = 'Opening이 직육면체 모양이 아닙니다. 추출에 오류가 발생할 수 있습니다.'
+            utils.logger.warning(msg)
 
           # 공간과 거리가 떨어져 있는 face (= inlet / outlet) 판단
           dist = [shapes_distance(face, self._space, tol) for face in faces]
@@ -253,30 +253,28 @@ class ObjConverter:
               if i not in surface_opening_vol_idx
           ]
 
-  def classify_walls(self, tol):
+  def classify_walls(self, tol=1e-4):
     if self._walls is None:
       return
 
+    # 각 surface에 대해 가장 가까운 wall의 번호 계산
+    center_gp = [
+        GpropsFromShape(x).surface().CentreOfMass() for x in self._obj_surface
+    ]
+    center_vertex = [BRepBuilderAPI_MakeVertex(x).Vertex() for x in center_gp]
+    dist = np.array([
+        [shapes_distance(c, w, tol) for w in self._walls] for c in center_vertex
+    ])
+    closest = np.argmin(dist, axis=1)
+
+    if self._wall_names is None:
+      length = len(str(int(np.max(closest))))
+      names = ['{:0{}d}'.format(x, length) for x in closest]
     else:
-      # 각 surface에 대해 가장 가까운 wall의 번호 계산
-      center_gp = [
-          GpropsFromShape(x).surface().CentreOfMass() for x in self._obj_surface
-      ]
-      center_vertex = [BRepBuilderAPI_MakeVertex(x).Vertex() for x in center_gp]
-      dist = np.array([[shapes_distance(c, w, tol)
-                        for w in self._walls]
-                       for c in center_vertex])
-      closest = np.argmin(dist, axis=1)
+      names = [self._wall_names[x] for x in closest]
 
-      if self._wall_names is None:
-        length = len(str(int(np.max(closest))))
-        names = ['{:0{}d}'.format(x, length) for x in closest]
-      else:
-        names = [self._wall_names[x] for x in closest]
-
-      self._obj_surface = tuple(
-          (x, y) for x, y in zip(names, self._obj_surface))
-      return
+    self._obj_surface = tuple((x, y) for x, y in zip(names, self._obj_surface))
+    return
 
   def extract_faces(self,
                     obj_path,
@@ -365,7 +363,7 @@ class ObjConverter:
 
   def valid_surfaces(self):
     if (self._obj_surface is not None) and (self._wall_names is not None):
-      names = list(set([x[0] for x in self._obj_surface]))
+      names = list(set(x[0] for x in self._obj_surface))
       names.sort()
     else:
       names = None
@@ -383,7 +381,7 @@ def fix_surface_name(obj_path):
     with open(obj_path) as f:
       geom = f.readlines()
   except FileNotFoundError:
-    warn('Obj 표면 이름 변환 오류')
+    utils.logger.error('Obj 표면 이름 변환 오류')
     return
 
   p = re.compile(r'((\w+_[a-z0-9]+)_){2}None',

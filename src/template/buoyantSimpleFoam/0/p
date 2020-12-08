@@ -25,6 +25,17 @@ boundaryField
         type            calculated;
         value           $internalField;
     }
+    
+    inlet
+    {
+        type            zeroGradient;
+    }
+    
+    outlet
+    {
+        type            totalPressure;
+        p0              $internalField;
+    }
 
     wall
     {

@@ -23,7 +23,14 @@ boundaryField
 {
     opening
     {
-        type            kqRWallFunction;
+        type            fixedValue;
+        value           $internalField;
+    }
+
+    outlet
+    {
+        type            inletOutlet;
+        inletValue      $internalField;
         value           $internalField;
     }
 

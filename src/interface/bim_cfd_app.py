@@ -55,7 +55,6 @@ class BimCfdApp(BimCfdAppBase):
     self._converter: ifccnv.IfcConverter = None
     self._spaces: list = None
     self._target_space_id = None
-
     self._simplified: dict = None
 
   def on_start(self):
@@ -75,8 +74,8 @@ class BimCfdApp(BimCfdAppBase):
     try:
       self._converter = ifccnv.IfcConverter(path=path.as_posix())
     except Exception as e:
-      self._logger.error(e)
       self.show_snackbar('IFC 로드 실패')
+      self._logger.error(e)
       return
 
     self.update_ifc_spaces()
@@ -85,10 +84,21 @@ class BimCfdApp(BimCfdAppBase):
     if options is not None:
       self._converter.brep_deflection = options['precision']
 
+    self.show_snackbar('IFC 로드 완료', duration=1.0)
+
   @mainthread
   def update_ifc_spaces(self):
     if self._converter is not None:
       spaces = self._converter.ifc.by_type('IfcSpace')
+      spaces.sort(key=lambda x: x.Name)
+
+      if utils.TTA:
+        # todo: TTA
+        # spaces = [x for x in spaces if x.Name[2] == '2']
+        spaces = [x for x in spaces if x.id() < 10000]
+        if len(spaces) > 25:
+          spaces = spaces[:25]
+
       width = len(str(len(spaces) + 1))
 
       names = [
@@ -116,6 +126,7 @@ class BimCfdApp(BimCfdAppBase):
       selected_text = self.spaces_menu.selected_item_text()
       index = IfcEntityText.index(selected_text)
       space_entity = self._spaces[index - 1]
+      self._logger.debug('Selected space entity: %s', space_entity)
 
     return space_entity
 
@@ -160,9 +171,12 @@ class BimCfdApp(BimCfdAppBase):
     if options['flag_simplify']:
       options['angle_threshold'] *= (3.141592 / 180)  # degree to rad
     else:
-      options['dist_threshold'] = 0.0
+      msg = '형상 단순화를 시행하지 않습니다. 전처리에 오랜 시간이 소요될 수 있습니다.'
+      self._logger.warning(msg)
+      options['dist_threshold'] = 0.001  # 작은 기준으로 전처리
       options['vol_threshold'] = 0.0
       options['angle_threshold'] = 0.0
+      options['flag_relative_threshold'] = False
 
     # 단순화
     simplified = self._converter.simplify_space(
@@ -173,7 +187,6 @@ class BimCfdApp(BimCfdAppBase):
         relative_threshold=options['flag_relative_threshold'],
         preserve_opening=options['flag_preserve_openings'],
         opening_volume=options['flag_opening_volume'])
-    # fixme: wall, opening 정보 안 들어옴
     assert simplified is not None
     self._simplified = simplified
 
@@ -227,10 +240,7 @@ class BimCfdApp(BimCfdAppBase):
   @with_spinner
   def _execute_helper(self, simplified, save_dir: Path):
     assert simplified is not None
-
     openfoam_options = self.get_openfoam_options()
-    # for test
-    openfoam_options['num_of_subdomains'] = 4
 
     geom_dir = save_dir.joinpath('BIMCFD', 'geometry')
     if not geom_dir.exists():
@@ -259,7 +269,7 @@ class BimCfdApp(BimCfdAppBase):
 
     self._execute_helper(simplified=self._simplified, save_dir=save_dir)
 
-    self._logger.info('Saved CFD case')
+    self._logger.info('Saved CFD case in %s', save_dir)
 
   def test_add_tables(self):
     self.add_geom_table(

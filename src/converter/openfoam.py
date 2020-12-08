@@ -1,12 +1,11 @@
 import logging
-import os
 from collections import OrderedDict, namedtuple
 from itertools import chain
 from pathlib import Path
 from shutil import copy2, rmtree
 from typing import List, Tuple
 
-from utils import TEMPLATE_DIR
+from utils import TEMPLATE_DIR, TTA
 
 from butterfly.case import Case as ButterflyCase
 from butterfly.decomposeParDict import DecomposeParDict
@@ -47,8 +46,11 @@ _MESH_SH = (b'surfaceFeatureEdges -angle 0 geometry.obj geometry.fms\n'
             b'cartesianMesh\n'
             b'checkMesh | tee log.mesh\n'
             b'decomposePar -force')
-_RUN_SH = b'foamJob %s'
-_PARALLEL_RUN_SH = (b'foamJob -s mpirun -np %s %s -parallel\nreconstructPar')
+_RUN_SH = b'%s | tee log.run\nfoamLog log.run'
+_PARALLEL_RUN_SH = (b'mpirun -np %s %s -parallel | tee log.run\n'
+                    b'reconstructPar\n'
+                    b'postProcess -func "mag(U)"\n'
+                    b'foamLog log.run')
 
 
 def supported_solvers(energy=False,
@@ -135,7 +137,7 @@ class BoundaryFieldDict(OrderedDict):
 
 
 class OpenFoamCase(ButterflyCase):
-  logger = logging.getLogger(Path(__file__).stem)
+  logger = logging.getLogger('BIMCFD')
 
   SUBFOLDERS = ('0', 'constant', 'constant\\polyMesh', 'system')
 
@@ -342,11 +344,13 @@ class OpenFoamCase(ButterflyCase):
 
     self.logger.info('%s is saved to: %s', self.project_name, self.project_dir)
 
-  def save_shell(self, solver: str, num_of_subdomains: int):
+  def save_shell(self, solver: str, num_of_subdomains: int = None):
     proj_dir = self.project_dir
 
     # .foam file
     foam_path = proj_dir.joinpath(self.project_name + '.foam')
+    if TTA:
+      foam_path = proj_dir.joinpath('Simulation_result.foam')
     with open(foam_path, 'w') as f:
       f.write('')
 
@@ -356,8 +360,8 @@ class OpenFoamCase(ButterflyCase):
       f.write(_MESH_SH)
 
     # decomposeParDict
-    if num_of_subdomains > 1:
-      decom = DecomposeParDict.scotch(numberOfSubdomains=num_of_subdomains)
+    if num_of_subdomains and num_of_subdomains > 1:
+      decom = DecomposeParDict.scotch(numberOfSubdomains=int(num_of_subdomains))
       decom.save(proj_dir)
 
       run_sh = _PARALLEL_RUN_SH % (str(num_of_subdomains).encode(),

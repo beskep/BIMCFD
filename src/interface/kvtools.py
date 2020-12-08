@@ -3,6 +3,8 @@ import os
 from kivy.core.text import LabelBase
 from kivy.lang.builder import Builder
 
+# todo: kivy config, 우클릭 비활성화
+
 
 def load_kv(path, encoding='UTF-8'):
   if not os.path.exists(path):
