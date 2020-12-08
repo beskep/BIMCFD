@@ -183,10 +183,11 @@ class CfdSettingDialog(MDDialog):
   @staticmethod
   def _get_option(key, ids):
     widget = getattr(ids, key)
+
     if key.startswith('flag'):
       option = (widget.state == 'down')
     elif key.startswith('text'):
-      text = widget.main_text
+      text = widget.get_main_text()
 
       try:
         option = float(text)
@@ -199,7 +200,10 @@ class CfdSettingDialog(MDDialog):
 
   def _get_options(self):
     ids = self.content_cls.ids
-    self._options = {x: self._get_option(x, ids) for x in self._option_ids}
+    opt = {x: self._get_option(x, ids) for x in self._option_ids}
+    assert opt['text_mesh_resolution'] or opt['text_mesh_size']
+
+    self._options = opt
 
   def _get_options_and_dismiss(self):
     self._get_options()

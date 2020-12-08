@@ -1,5 +1,5 @@
 import os
-from collections import OrderedDict
+from collections import OrderedDict, defaultdict
 from collections.abc import Collection
 from itertools import chain
 from typing import List, Tuple, Union
@@ -436,12 +436,19 @@ def geometric_features(shape: TopoDS_Shape):
   volume = gprops.volume().Mass()
   area = gprops.surface().Mass()
 
+  fs = defaultdict(list)
+  for solid in exp.solids():
+    for face in TopologyExplorer(solid).faces():
+      fs[face.HashCode(100000000)].append(solid)
+  surface_count = len([x for x in fs.values() if len(x) == 1])
+
   features = OrderedDict([
       ('volume', volume),
       ('area', area),
       ('characteristic_length', volume / area),
       ('solid_count', exp.number_of_solids()),
       ('face_count', exp.number_of_faces()),
+      ('surface_count', surface_count),
       ('edge_count', exp.number_of_edges()),
       ('vertex_count', exp.number_of_vertices()),
   ])

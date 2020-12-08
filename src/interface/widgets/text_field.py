@@ -7,6 +7,10 @@ from kivymd.uix.textfield import MDTextField
 
 class TextFieldFont(MDTextField):
 
+  def __init__(self, **kwargs):
+    self.has_had_text = False
+    super().__init__(**kwargs)
+
   def on_font_name(self, instance, value):
     self._hint_lbl.font_name = value
     self._msg_lbl.font_name = value
@@ -69,8 +73,7 @@ class TextFieldUnit(MDBoxLayout):
     self.add_widget(self._main_text)
     self.add_widget(self._unit_text)
 
-  @property
-  def main_text(self):
+  def get_main_text(self):
     return self._main_text.text
 
   def on_text(self, instance, value):

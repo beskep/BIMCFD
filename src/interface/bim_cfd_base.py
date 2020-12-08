@@ -324,7 +324,7 @@ class BimCfdAppBase(MDApp):
       field: TextFieldUnit = option_ids[option]
 
       try:
-        value = float(field.main_text)
+        value = float(field.get_main_text())
       except ValueError:
         msg = '[{}] 설정값이 올바르지 않습니다.'.format(label)
         self._logger.warning(msg)
@@ -391,9 +391,10 @@ class BimCfdAppBase(MDApp):
     self.spinner.active = active
 
   def add_geom_table(self, column_data, row_data):
-    data_table = MDDataTable(column_data=column_data, row_data=row_data)
+    data_table = MDDataTable(column_data=column_data,
+                             row_data=row_data,
+                             rows_num=len(row_data))
     data_table.pos_hint = {'center_x': 0.5, 'center_y': 0.5}
-    # fixme: 표 잘리는 현상 해결
 
     self.geom_table_layout.add_widget(data_table)
 

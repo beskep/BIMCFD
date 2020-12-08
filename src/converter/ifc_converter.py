@@ -12,6 +12,7 @@ import ifcopenshell.geom
 from ifcopenshell import entity_instance as IfcEntity
 from OCC.Core.TopoDS import TopoDS_Builder, TopoDS_Compound, TopoDS_Shape
 from OCC.Extend import DataExchange
+from OCC.Extend.TopologyUtils import TopologyExplorer
 
 from converter import geom_utils
 from converter.material_match import MaterialMatch
@@ -45,7 +46,8 @@ class IfcConverter:
       'min_cell_size': None,
       'grid_resolution': 24.0,
       'boundary_cell_size': None,
-      'boundary_layers': None
+      'boundary_layers': None,
+      'num_of_subdomains': 1
   }
 
   def __init__(self,
@@ -802,17 +804,6 @@ class IfcConverter:
 
       is_simplified = (simplified is not None)
 
-    info_original_geom = geom_utils.geometric_features(shape)
-    if simplified is None:
-      info_simplified_geom = None
-    else:
-      info_simplified_geom = geom_utils.geometric_features(simplified)
-
-    if fused is None:
-      info_fused_geom = None
-    else:
-      info_fused_geom = geom_utils.geometric_features(fused)
-
     info_simplification = {
         'threshold_volume': threshold_volume,
         'threshold_distance': threshold_dist,
@@ -823,12 +814,19 @@ class IfcConverter:
         'extract_opening_volume': opening_volume,
         'is_simplified': is_simplified
     }
+
+    info_original_geom = geom_utils.geometric_features(shape)
     info = {
         'simplification': info_simplification,
-        'original_geometry': info_original_geom,
-        'simplified_geometry': info_simplified_geom,
-        'fused_geometry': info_fused_geom
+        'original_geometry': info_original_geom
     }
+    info_keys = ['simplified_geometry', 'fused_geometry']
+    if is_simplified:
+      for key, geom in zip(info_keys, [simplified, fused]):
+        info[key] = geom_utils.geometric_features(geom)
+    else:
+      for key in info_keys:
+        info[key] = info['original_geometry']
 
     results = {
         'original': shape,
@@ -850,6 +848,13 @@ class IfcConverter:
 
     if is_simplified:
       shape = simplified['simplified']
+
+      original = simplified['original']
+      DataExchange.write_stl_file(a_shape=original,
+                                  filename=os.path.join(
+                                      path, 'original_geometry.stl'),
+                                  linear_deflection=self.brep_deflection[0],
+                                  angular_deflection=self.brep_deflection[1])
     else:
       shape = simplified['original']
 
@@ -897,8 +902,6 @@ class IfcConverter:
                 extract_opening_volume=extract_opening_volume)
     except RuntimeError as e:
       self._logger.error('obj 저장 실패:\n%s', e)
-
-    return
 
   def openfoam_case(self,
                     simplified,
@@ -1035,9 +1038,8 @@ class IfcConverter:
     open_foam_case.change_foam_file_value('meshDict', mesh_dict)
 
     open_foam_case.save(overwrite=False, minimum=False)
-    open_foam_case.save_shell()
-    # TODO: decomposeParDict 설정
-    return
+    open_foam_case.save_shell(solver=solver,
+                              num_of_subdomains=opt['num_of_subdomains'])
 
   def component_code(self, entities, prefix, storey_prefix='F'):
     if self._storeys is None:

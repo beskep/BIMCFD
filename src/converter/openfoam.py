@@ -9,6 +9,7 @@ from typing import List, Tuple
 from utils import TEMPLATE_DIR
 
 from butterfly.case import Case as ButterflyCase
+from butterfly.decomposeParDict import DecomposeParDict
 from butterfly.foamfile import FoamFile
 from butterfly.version import Header
 
@@ -44,7 +45,10 @@ for x in _SOLVER_PATH.values():
 
 _MESH_SH = (b'surfaceFeatureEdges -angle 0 geometry.obj geometry.fms\n'
             b'cartesianMesh\n'
-            b'checkMesh | tee log.mesh')
+            b'checkMesh | tee log.mesh\n'
+            b'decomposePar -force')
+_RUN_SH = b'foamJob %s'
+_PARALLEL_RUN_SH = (b'foamJob -s mpirun -np %s %s -parallel\nreconstructPar')
 
 
 def supported_solvers(energy=False,
@@ -64,27 +68,14 @@ def supported_solvers(energy=False,
   return solvers
 
 
-def iter_files(folder, fullpath=False):
-  """list files in a folder."""
-  if not os.path.isdir(folder):
-    yield None
-
-  for f in os.listdir(folder):
-    if os.path.isfile(os.path.join(folder, f)):
-      if fullpath:
-        yield os.path.join(folder, f)
-      else:
-        yield f
-    else:
-      yield
-
-
 def load_case_files(folder, fullpath=False):
   """load openfoam files from a folder."""
+  folder = Path(folder).resolve()
   files = []
   for p in ('0', 'constant', 'system'):
-    fp = os.path.join(folder, p)
-    files.append(tuple(iter_files(fp, fullpath)))
+    fs = folder.joinpath(p).rglob('*')
+    fs = tuple(x.as_posix() for x in fs if x.is_file())
+    files.append(fs)
 
   Files = namedtuple('Files', 'zero constant system')
   return Files(*files)
@@ -164,7 +155,7 @@ class OpenFoamCase(ButterflyCase):
 
     super().__init__(name=name, foamfiles=foamfiles, geometries=geometries)
 
-    self.working_dir = os.path.normpath(working_dir)
+    self.working_dir = Path(working_dir)
     self._original_dir = None
     self._solver = None
 
@@ -179,9 +170,15 @@ class OpenFoamCase(ButterflyCase):
 
   @original_dir.setter
   def original_dir(self, value):
-    path = os.path.normpath(value)
-    if os.path.exists(path):
+    path = Path(value)
+    if path.exists():
       self._original_dir = path
+    else:
+      raise FileNotFoundError(path)
+
+  @property
+  def project_dir(self):
+    return Path(super().project_dir)
 
   def load_mesh(self):
     pass
@@ -221,7 +218,7 @@ class OpenFoamCase(ButterflyCase):
             be the inverse of convertToMeters.
     """
     # collect foam files
-    __originalName = os.path.split(path)[-1]
+    __originalName = Path(path).stem
     if not name:
       name = __originalName
 
@@ -247,10 +244,10 @@ class OpenFoamCase(ButterflyCase):
         if foam_file:
           ff.append(foam_file)
 
-        cls.logger.debug('Imported %s from case', os.path.normpath(p))
+        cls.logger.debug('Imported %s from case', Path(p))
 
       except Exception as e:
-        cls.logger.error('Failed to import %s:\n\t%s', os.path.normpath(p), e)
+        cls.logger.error('Failed to import %s:\n\t%s', Path(p), e)
         raise e
 
     bf_geometries = []
@@ -296,15 +293,16 @@ class OpenFoamCase(ButterflyCase):
             created from a Solution.
     """
     # create folder and subfolders if they are not already created
-    if overwrite and os.path.exists(self.project_dir):
-      rmtree(self.project_dir, ignore_errors=True)
+    proj_dir = self.project_dir
+    if overwrite and proj_dir.exists():
+      rmtree(proj_dir, ignore_errors=True)
 
     for f in self.SUBFOLDERS:
-      p = os.path.join(self.project_dir, f)
+      p = proj_dir.joinpath(f)
 
-      if not os.path.exists(p):
+      if not p.exists():
         try:
-          os.makedirs(p)
+          p.mkdir()
         except Exception as e:
           msg = 'Failed to create foam file {}\n\t{}'.format(p, e)
 
@@ -320,37 +318,56 @@ class OpenFoamCase(ButterflyCase):
     else:
       foam_files = list(self.foam_files)
 
-    for fname in self.MINFOAMFIles:
-      if fname not in [x.name for x in foam_files]:
-        ff = FoamFile(name=fname, cls='dictionary', location='system')
-        foam_files.append(ff)
+    ffnames = [x.name for x in foam_files]
+    assert all(x in ffnames for x in self.MINFOAMFIles)
+    # 빠지는 foam file이 있으면 아래 주석 실행
+    # for fname in self.MINFOAMFIles:
+    #   if fname not in [x.name for x in foam_files]:
+    #     ff = FoamFile(name=fname, cls='dictionary', location='system')
+    #     foam_files.append(ff)
+    flag_copy = self.original_dir is not None
 
     for f in foam_files:
-      if self.original_dir and (f.location != '"0"') and (f.name != 'meshDict'):
+      if flag_copy and (f.location != '"0"') and (f.name != 'meshDict'):
         sub_folder = f.location.replace('"', '')
         file_name = f.name
 
-        path_from = os.path.join(self.original_dir, sub_folder, file_name)
-        assert os.path.exists(path_from)
+        path_from = self.original_dir.joinpath(sub_folder, file_name)
+        assert path_from.exists()
 
-        path_to = os.path.join(self.project_dir, sub_folder, file_name)
+        path_to = proj_dir.joinpath(sub_folder, file_name)
         copy2(path_from, path_to)
       else:
-        f.save(self.project_dir)
-
-    # add .foam file
-    foam_path = os.path.join(self.project_dir, self.project_name + '.foam')
-    with open(foam_path, 'w') as f:
-      f.write('')
+        f.save(proj_dir)
 
     self.logger.info('%s is saved to: %s', self.project_name, self.project_dir)
 
-  def save_shell(self):
-    # todo: decomposePar, run 지원
-    mesh = os.path.join(self.project_dir, 'mesh.sh')
+  def save_shell(self, solver: str, num_of_subdomains: int):
+    proj_dir = self.project_dir
 
-    with open(mesh, 'wb') as f:
+    # .foam file
+    foam_path = proj_dir.joinpath(self.project_name + '.foam')
+    with open(foam_path, 'w') as f:
+      f.write('')
+
+    # mesh.sh
+    mesh_path = proj_dir.joinpath('mesh.sh')
+    with open(mesh_path, 'wb') as f:
       f.write(_MESH_SH)
+
+    # decomposeParDict
+    if num_of_subdomains > 1:
+      decom = DecomposeParDict.scotch(numberOfSubdomains=num_of_subdomains)
+      decom.save(proj_dir)
+
+      run_sh = _PARALLEL_RUN_SH % (str(num_of_subdomains).encode(),
+                                   solver.encode())
+    else:
+      run_sh = _RUN_SH % solver.encode()
+
+    run_path = proj_dir.joinpath('run.sh')
+    with open(run_path, 'wb') as f:
+      f.write(run_sh)
 
   def change_boundary_field(self, variable, boundary_field: BoundaryFieldDict):
     foam_file = None

@@ -13,6 +13,13 @@ from interface.bim_cfd_base import BimCfdAppBase, with_spinner
 from interface.widgets import topo_widget as topo
 
 
+def _itc(geom_info: dict):
+  itc = (3.0 / geom_info['face_count'] + 6.0 / geom_info['edge_count'])
+  itc = min(1.0, itc)
+
+  return itc
+
+
 class IfcEntityText:
   text_format = '[{:{fmt}d}] {}'
   pattern = re.compile(r'^\[(\d+)\] (.*)$')
@@ -37,8 +44,9 @@ class BimCfdApp(BimCfdAppBase):
       'volume': '부피 (m³)',
       'area': '면적 (m²)',
       'characteristic_length': '길이 (m)',
-      'face_count': '표면 개수',
-      'solid_count': None
+      'face_count': 'Face 개수',
+      'edge_count': 'Edge 개수',
+      'vertex_count': 'Vertex 개수'
   }
 
   def __init__(self, **kwargs):
@@ -71,10 +79,11 @@ class BimCfdApp(BimCfdAppBase):
       self.show_snackbar('IFC 로드 실패')
       return
 
+    self.update_ifc_spaces()
+
     options = self.get_simplification_options()
     if options is not None:
       self._converter.brep_deflection = options['precision']
-      self.update_ifc_spaces()
 
   @mainthread
   def update_ifc_spaces(self):
@@ -164,6 +173,7 @@ class BimCfdApp(BimCfdAppBase):
         relative_threshold=options['flag_relative_threshold'],
         preserve_opening=options['flag_preserve_openings'],
         opening_volume=options['flag_opening_volume'])
+    # fixme: wall, opening 정보 안 들어옴
     assert simplified is not None
     self._simplified = simplified
 
@@ -179,7 +189,7 @@ class BimCfdApp(BimCfdAppBase):
 
     self.show_simplification_results()
     self.execute_button.disabled = False
-    self.show_snackbar('형상 전처리 완료')
+    self.show_snackbar('형상 전처리 완료', duration=1.0)
 
   @mainthread
   def show_simplification_results(self):
@@ -189,6 +199,7 @@ class BimCfdApp(BimCfdAppBase):
       return
 
     # TODO: 표 다듬기
+    # todo: 단순화된 형상의 face 개수 증가하는 문제 해결 (un-brep/tessellation?)
     geom_cols = [('변수', dp(50)), ('전처리 전', dp(50)), ('전처리 후', dp(50))]
     geom_orig: dict = simplified['info']['original_geometry']
     geom_simp: dict = simplified['info']['fused_geometry']
@@ -198,7 +209,12 @@ class BimCfdApp(BimCfdAppBase):
         geom_simp = dict()
 
     geom_vars = list(geom_orig.keys())
-    geom_rows = [(x, geom_orig[x], geom_simp.get(x, 'NA')) for x in geom_vars]
+    geom_rows = [(self._geom_vars_kor[x], geom_orig[x], geom_simp.get(x, 'NA'))
+                 for x in geom_vars
+                 if x in self._geom_vars_kor]
+    geom_rows.append(
+        ('Inverse Topology Count', _itc(geom_orig), _itc(geom_simp)))
+
     self.geom_table_layout.clear_widgets()
     self.add_geom_table(column_data=geom_cols, row_data=geom_rows)
 
@@ -209,8 +225,12 @@ class BimCfdApp(BimCfdAppBase):
     self.visualize_topology(spaces=[geom])
 
   @with_spinner
-  def _execute_helper(self, simplified, save_dir: Path, openfoam_options):
+  def _execute_helper(self, simplified, save_dir: Path):
     assert simplified is not None
+
+    openfoam_options = self.get_openfoam_options()
+    # for test
+    openfoam_options['num_of_subdomains'] = 4
 
     geom_dir = save_dir.joinpath('BIMCFD', 'geometry')
     if not geom_dir.exists():
@@ -237,11 +257,7 @@ class BimCfdApp(BimCfdAppBase):
       self.show_snackbar('형상 전처리가 완료되지 않았습니다')
       return
 
-    of_options = self.get_openfoam_options()
-
-    self._execute_helper(simplified=self._simplified,
-                         save_dir=save_dir,
-                         openfoam_options=of_options)
+    self._execute_helper(simplified=self._simplified, save_dir=save_dir)
 
     self._logger.info('Saved CFD case')
 
