@@ -3,6 +3,7 @@ import re
 import subprocess
 from collections import defaultdict
 from itertools import chain
+from pathlib import Path
 from tempfile import TemporaryDirectory
 from typing import Collection, Iterable, Union
 
@@ -20,7 +21,7 @@ from OCCUtils.Construct import compound
 from converter.geom_utils import get_boundingbox, shapes_distance
 from converter.simplify import face_info
 
-DEFAULT_BLENDER_PATH = r'C:\Program Files\Blender Foundation\Blender\blender'
+BLENDER_FOUNDATION_PATH = Path(r'C:\Program Files\Blender Foundation')
 
 EMPTY_BLEND_PATH = utils.RESOURCE_DIR.joinpath('empty.blend')
 BLENDER_SCRIPT_PATH = utils.SRC_DIR.joinpath('converter/blender.py')
@@ -28,16 +29,47 @@ assert EMPTY_BLEND_PATH.exists(), EMPTY_BLEND_PATH
 assert BLENDER_SCRIPT_PATH.exists(), BLENDER_SCRIPT_PATH
 
 
-def stl_to_obj(obj_path, blender_path=None, *args):
+def find_blender_path(path=None):
+  if path is None:
+    path = BLENDER_FOUNDATION_PATH
+  else:
+    path = Path(path)
+
+  if not path.exists():
+    res = None
+  else:
+    if path.is_file() and path.name == 'blender.exe':
+      res = path
+    else:
+      if path.is_file():
+        path = path.parent
+
+      ls = list(path.rglob('blender.exe'))
+      if not ls:
+        res = None
+      else:
+        res = sorted(ls)[-1]
+
+  return res
+
+
+def stl_to_obj(obj_path, blender_path: Union[None, str, Path], *args):
   obj_path = os.path.abspath(obj_path)
   stl_path = [os.path.abspath(x) for x in args]
 
   if blender_path is None:
-    blender_path = DEFAULT_BLENDER_PATH[:]
-  assert os.path.exists(os.path.dirname(blender_path))
+    path = utils.config['blender_path']
+    if not path:
+      path = None
+    blender_path = find_blender_path(path)
+
+  utils.logger.info('blender path: "%s"', blender_path)
+  if blender_path is None or not blender_path.exists():
+    raise FileNotFoundError('blender의 경로를 찾을 수 없습니다. '
+                            '설치하거나 src\\config.yaml에 경로를 지정해주세요.')
 
   run_args = [
-      blender_path,
+      blender_path.as_posix(),
       EMPTY_BLEND_PATH.as_posix(),
       '--background',
       '--python',

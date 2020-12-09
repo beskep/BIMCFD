@@ -25,18 +25,15 @@ _SRC_DIR = SRC_DIR.as_posix()
 if _SRC_DIR not in sys.path:
   sys.path.insert(0, _SRC_DIR)
 
+config_path = SRC_DIR.joinpath('config.yaml')
+with open(config_path, 'r', encoding='utf-8') as f:
+  config = yaml.load(f, Loader=yaml.FullLoader)
+
 if 'utils' not in sys.modules:
   msgs = []
 
-  config_path = RESOURCE_DIR.joinpath('logging.yaml')
-  if not config_path.exists():
-    msgs.append('{} not found'.format(config_path))
-  else:
-    with open(config_path, 'r', encoding='utf-8') as f:
-      config = yaml.load(f, Loader=yaml.FullLoader)
-
-    logging.config.dictConfig(config)
-    logging.getLogger('BIMCFD').addHandler(_righ_handler)
+  logging.config.dictConfig(config['logging'])
+  logging.getLogger('BIMCFD').addHandler(_righ_handler)
 
   try:
     from kivy.logger import Logger as kvlogger

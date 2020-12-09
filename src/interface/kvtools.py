@@ -8,6 +8,7 @@ from kivy.lang.builder import Builder
 def config():
   Config.set(section='kivy', option='log_enable', value=0)
   Config.set(section='kivy', option='exit_on_escape', value=0)
+  Config.set(section='graphics', option='multisamples', value=4)
   Config.set(section='input',
              option='mouse',
              value='mouse,multitouch_on_demand')

@@ -29,7 +29,7 @@ class CfdSettingContent(MDBoxLayout):
 
   SpacingBox:
     orientation: 'vertical'
-    size_hint_y: 0.5
+    size_hint_y: 0.3
     padding: dp(10)
 
     SpacingBox:
