@@ -1,9 +1,16 @@
 import os
 
+from kivy.config import Config
 from kivy.core.text import LabelBase
 from kivy.lang.builder import Builder
 
-# todo: kivy config, 우클릭 비활성화
+
+def config():
+  Config.set(section='kivy', option='log_enable', value=0)
+  Config.set(section='kivy', option='exit_on_escape', value=0)
+  Config.set(section='input',
+             option='mouse',
+             value='mouse,multitouch_on_demand')
 
 
 def load_kv(path, encoding='UTF-8'):

@@ -359,13 +359,15 @@ class OpenFoamCase(ButterflyCase):
     with open(mesh_path, 'wb') as f:
       f.write(_MESH_SH)
 
-    # decomposeParDict
+    # decomposeParDict, run.sh
     if num_of_subdomains and num_of_subdomains > 1:
       decom = DecomposeParDict.scotch(numberOfSubdomains=int(num_of_subdomains))
       decom.save(proj_dir)
 
-      run_sh = _PARALLEL_RUN_SH % (str(num_of_subdomains).encode(),
-                                   solver.encode())
+      run_sh = _PARALLEL_RUN_SH % (
+          str(int(num_of_subdomains)).encode(),
+          solver.encode(),
+      )
     else:
       run_sh = _RUN_SH % solver.encode()
 

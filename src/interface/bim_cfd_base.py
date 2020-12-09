@@ -75,8 +75,8 @@ class BimCfdAppBase(MDApp):
     self.file_manager.exit_manager = self.exit_file_manager
     self.file_manager.select_path = self.select_path
 
-    self._bim_path = '/'
-    self._save_dir = '/'
+    self._bim_path = '\\'
+    self._save_dir = '\\'
 
     self._space_menu: DropDownMenu = None
     self._solver_menu: DropDownMenu = None
@@ -85,6 +85,7 @@ class BimCfdAppBase(MDApp):
 
     self._snackbar = Snackbar()
     self._snackbar.duration = 2
+    self._snackbar.font_size = dp(16)
 
     self._cfd_dialog = None
     self._cfd_options = None
@@ -113,6 +114,10 @@ class BimCfdAppBase(MDApp):
   def on_start(self):
     super().on_start()
 
+    # simplification option
+    self.root.ids.simplification_panel.ids.flag_simplify.active = False
+
+    # snackbar
     gap = dp(10)
     self._snackbar.snackbar_x = gap
     self._snackbar.snackbar_y = gap
@@ -198,9 +203,11 @@ class BimCfdAppBase(MDApp):
     if mode == 'bim':
       cur_dir = self._bim_path
       ext = ['.ifc', '.IFC']
+      search = 'all'
     elif mode == 'save':
       cur_dir = self._save_dir
       ext = []
+      search = 'dirs'
     else:
       msg = 'file_manager.mode ({}) not in ["bim", "save"]'.format(mode)
       self._logger.error(msg)
@@ -208,6 +215,7 @@ class BimCfdAppBase(MDApp):
 
     self.file_manager.mode = mode
     self.file_manager.ext = ext
+    self.file_manager.search = search
     self.file_manager.show(cur_dir)
 
     if not self.file_manager._window_manager_open:
@@ -227,6 +235,9 @@ class BimCfdAppBase(MDApp):
       self.bim_path_field.text = path.as_posix()
 
     elif mode == 'save':
+      if not path.is_dir():
+        path = path.parent
+
       self._save_dir = path.as_posix()
       self.save_dir_field.text = path.as_posix()
 
@@ -254,19 +265,14 @@ class BimCfdAppBase(MDApp):
     state : str
         단순화 여부 선택 버튼의 state ({'down', 'normal'})
     """
+    assert state in ['down', 'normal'], 'state is {}'.format(state)
+
     options = ['dist_threshold', 'vol_threshold', 'angle_threshold']
     simplification_ids = self.root.ids.simplification_panel.ids
 
     for option in options:
       field: TextFieldUnit = simplification_ids[option]
-
-      if state == 'down':
-        field.activate()
-      elif state == 'normal':
-        field.deactivate()
-      else:
-        msg = 'Unexpected button state: {}'.format(state)
-        self._logger.error(msg)
+      field.main_text_disabled = (state == 'normal')
 
   def check_relative_threshold(self, state):
     """단순화에 상대적 기준 설정 여부에 따라 필드의 단위 표시/비표시
@@ -276,19 +282,14 @@ class BimCfdAppBase(MDApp):
     state : str
         상대적 기준 적용 버튼의 state ({'down', 'normal'})
     """
+    assert state in ['down', 'normal'], 'state is {}'.format(state)
+
     options = ['dist_threshold', 'vol_threshold']
     simplification_ids = self.root.ids.simplification_panel.ids
 
     for option in options:
       field: TextFieldUnit = simplification_ids[option]
-
-      if state == 'down':
-        field.deactivate_unit()
-      elif state == 'normal':
-        field.activate_unit()
-      else:
-        msg = 'Unexpected button state: {}'.format(state)
-        self._logger.error(msg)
+      field.show_unit = state == 'normal'
 
   def get_simplification_options(self):
     boolean_options = [
@@ -337,12 +338,13 @@ class BimCfdAppBase(MDApp):
 
   def get_openfoam_options(self):
     solver = self.solver_menu.selected_item_text()
-    flag_external_zone = self.get_simplification_options()['flag_external_zone']
+    simplfication_opt = self.get_simplification_options()
     dialog_opt = self.cfd_dialog.options
 
     ofopt = {
         'solver': solver,
-        'flag_external_zone': flag_external_zone,
+        'flag_external_zone': simplfication_opt['flag_external_zone'],
+        'flag_interior_faces': simplfication_opt['flag_internal_faces'],
         'flag_heat_flux': dialog_opt['flag_heat_flux'],
         'flag_friction': dialog_opt['flag_friction'],
         'external_temperature': dialog_opt['text_external_temperature'],
@@ -364,8 +366,8 @@ class BimCfdAppBase(MDApp):
         'text_num_of_subdomains': 'num_of_subdomains',
     }
     for dkey, okey in keys.items():
-      if dialog_opt[dkey]:
-        ofopt[okey] = dialog_opt[dkey]
+      option = dialog_opt[dkey]
+      ofopt[okey] = option if option else None
 
     if dialog_opt['text_boundary_layers_count']:
       ofopt['boundary_layers'] = {
@@ -373,6 +375,10 @@ class BimCfdAppBase(MDApp):
       }
 
     return ofopt
+
+  @mainthread
+  def _set_grid_resolution(self, resolution):
+    self.cfd_dialog.set_grid_resolution(resolution=resolution)
 
   def show_snackbar(self, message, duration=None):
     self._snackbar.text = message
@@ -387,7 +393,7 @@ class BimCfdAppBase(MDApp):
       # 이번 요청은 무시
       pass
 
-    self._logger.info('Snackbar: %s', message)
+    self._logger.info('[Snackbar] %s', message)
 
   @mainthread
   def activate_spinner(self, active=True):

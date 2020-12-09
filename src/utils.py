@@ -8,17 +8,15 @@ from rich.logging import RichHandler
 
 TTA = True
 
-_PARENT = Path(__file__).parent.resolve()
 _righ_handler = RichHandler(level=logging.INFO, show_time=False)
 
 if getattr(sys, 'frozen', False) and hasattr(sys, '_MEIPASS'):
   # pyinstaller
-  # FIXME: 안돼잖아?
-  PRJ_DIR = _PARENT
-  SRC_DIR = _PARENT.joinpath('src')
+  PRJ_DIR = Path(getattr(sys, '_MEIPASS'))
+  SRC_DIR = PRJ_DIR.joinpath('src')
 else:
-  PRJ_DIR = _PARENT.parent
-  SRC_DIR = _PARENT
+  SRC_DIR = Path(__file__).parent.resolve()
+  PRJ_DIR = SRC_DIR.parent
 
 RESOURCE_DIR = SRC_DIR.joinpath('resource')
 TEMPLATE_DIR = SRC_DIR.joinpath('template')

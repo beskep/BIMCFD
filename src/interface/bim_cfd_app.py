@@ -198,7 +198,7 @@ class BimCfdApp(BimCfdAppBase):
       grid_resolution = 16
     else:
       grid_resolution = 24
-    self.cfd_dialog.set_grid_resolution(resolution=grid_resolution)
+    self._set_grid_resolution(grid_resolution)
 
     self.show_simplification_results()
     self.execute_button.disabled = False
@@ -252,6 +252,7 @@ class BimCfdApp(BimCfdAppBase):
                                   save_dir=save_dir,
                                   case_name='BIMCFD',
                                   openfoam_options=openfoam_options)
+    self._logger.info('Saved CFD case in %s', save_dir)
 
   def execute(self):
     if not self.save_dir_field.text:
@@ -263,13 +264,15 @@ class BimCfdApp(BimCfdAppBase):
       self.show_snackbar('저장 경로가 존재하지 않습니다')
       return
 
+    if save_dir.joinpath('BIMCFD').exists():
+      self.show_snackbar('대상 경로에 이미 `BIMCFD` 폴더가 존재합니다.')
+      return
+
     if self._simplified is None:
       self.show_snackbar('형상 전처리가 완료되지 않았습니다')
       return
 
     self._execute_helper(simplified=self._simplified, save_dir=save_dir)
-
-    self._logger.info('Saved CFD case in %s', save_dir)
 
   def test_add_tables(self):
     self.add_geom_table(
@@ -290,6 +293,7 @@ def main():
   kvtools.register_font(name='NotoSansKR',
                         fn_regular=font_regular.as_posix(),
                         fn_bold=font_bold.as_posix())
+  kvtools.config()
   kvtools.set_window_size(size=(1280, 720))
 
   kv_dir = utils.SRC_DIR.joinpath('./interface/kvs')

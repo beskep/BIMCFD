@@ -30,7 +30,7 @@
 
                         MDCheckbox:
                             id: flag_simplify
-                            active: False
+                            active: True  # app.on_start()에서 변경
                             on_state: app.check_simplify(self.state)
                         MDCheckbox:
                             id: flag_relative_threshold
@@ -96,13 +96,11 @@
                     AnchorLayout:
                         anchor_x: 'right'
                         size_hint_y: 0.5
-                        # size_hint_y: None
                         MDRaisedButton:
                             id: simplify
                             text: '형상 전처리'
                             disabled: True
                             on_release: app.simplify_space()
-                            # size_hint_y: None
                 
                 MDBoxLayout:
                     size_hint_x: None

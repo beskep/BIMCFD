@@ -74,6 +74,7 @@ class CfdSettingContent(MDBoxLayout):
           group: 'mesh'
           size_hint_x: None
           id: flag_mesh_resolution
+          on_state: root._select_mesh_size_method()
         MDLabel:
           text: '격자 해상도 설정'
 
@@ -132,11 +133,21 @@ class CfdSettingContent(MDBoxLayout):
     self.load_kv()
     super().__init__(*args, **kwargs)
 
+    self.ids.text_mesh_size.main_text_disabled = True
+
   @classmethod
   def load_kv(cls):
     if not cls.flag_kv_loaded:
       Builder.load_string(cls.kv)
       cls.flag_kv_loaded = True
+
+  def _select_mesh_size_method(self):
+    flag_resolution = (self.ids.flag_mesh_resolution.state == 'down')
+    resolution_field: TextFieldUnit = self.ids.text_mesh_resolution
+    mesh_size_field: TextFieldUnit = self.ids.text_mesh_size
+
+    resolution_field.main_text_disabled = not flag_resolution
+    mesh_size_field.main_text_disabled = flag_resolution
 
 
 class CfdSettingDialog(MDDialog):
@@ -173,8 +184,6 @@ class CfdSettingDialog(MDDialog):
     kwargs['buttons'] = [cancel_button, set_button]
 
     super().__init__(title=title, **kwargs)
-
-    # todo: 격자 해상도/크기 라디오 버튼 선택에 따라 입력 필드 활성/비활성화
 
   @property
   def options(self):

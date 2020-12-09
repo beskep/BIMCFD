@@ -40,7 +40,7 @@ class TextFieldNumeric(TextFieldFont):
     self.helper_text_mode = 'on_error'
 
   def on_text(self, instance, text: str):
-    if not text.replace('.', '', 1).isdigit():
+    if text and not text.replace('.', '', 1).isdigit():
       self.error = True
       self.helper_text = '숫자를 입력해주세요'
     else:
@@ -53,10 +53,12 @@ class TextFieldUnit(MDBoxLayout):
   text = StringProperty('')
   hint_text = StringProperty('')
   unit = StringProperty('')
-  show_unit = BooleanProperty(True)
 
   main_text = ObjectProperty('')
   unit_text = ObjectProperty('')
+
+  show_unit = BooleanProperty(True)
+  main_text_disabled = BooleanProperty(False)
 
   def __init__(self, **kwargs):
     super().__init__(**kwargs)
@@ -100,14 +102,5 @@ class TextFieldUnit(MDBoxLayout):
     for key, value in option.items():
       setattr(self._main_text, key, value)
 
-  def activate(self):
-    self._main_text.disabled = False
-
-  def deactivate(self):
-    self._main_text.disabled = True
-
-  def activate_unit(self):
-    self._unit_text.text = self.unit
-
-  def deactivate_unit(self):
-    self._unit_text.text = ''
+  def on_main_text_disabled(self, instance, value):
+    self._main_text.disabled = bool(value)
