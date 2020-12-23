@@ -8,6 +8,7 @@ from kivy.metrics import dp
 
 from converter import ifc_converter as ifccnv
 from converter import openfoam
+from converter.geom_utils import align_obj_to_origin
 from interface import kvtools
 from interface.bim_cfd_base import BimCfdAppBase, with_spinner
 from interface.widgets import topo_widget as topo
@@ -56,6 +57,8 @@ class BimCfdApp(BimCfdAppBase):
     self._spaces: list = None
     self._target_space_id = None
     self._simplified: dict = None
+
+    # todo: 그래픽 관련 method 모두 mainthread로
 
   def on_start(self):
     super().on_start()
@@ -248,11 +251,19 @@ class BimCfdApp(BimCfdAppBase):
 
     self._converter.save_simplified_space(simplified=simplified,
                                           path=geom_dir.as_posix())
+
+    if utils.TTA:
+      geom_files = geom_dir.rglob('*.obj')
+      for file in geom_files:
+        try:
+          align_obj_to_origin(file)
+        except Exception:
+          pass
+
     self._converter.openfoam_case(simplified=simplified,
                                   save_dir=save_dir,
                                   case_name='BIMCFD',
                                   openfoam_options=openfoam_options)
-    self._logger.info('Saved CFD case in %s', save_dir)
 
   def execute(self):
     if not self.save_dir_field.text:

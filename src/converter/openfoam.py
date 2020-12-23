@@ -342,7 +342,8 @@ class OpenFoamCase(ButterflyCase):
       else:
         f.save(proj_dir)
 
-    self.logger.info('%s is saved to: %s', self.project_name, self.project_dir)
+    self.logger.info('Project %s is saved to %s', self.project_name,
+                     self.project_dir)
 
   def save_shell(self, solver: str, num_of_subdomains: int = None):
     proj_dir = self.project_dir
@@ -374,6 +375,11 @@ class OpenFoamCase(ButterflyCase):
     run_path = proj_dir.joinpath('run.sh')
     with open(run_path, 'wb') as f:
       f.write(run_sh)
+
+    if TTA:
+      # simulation
+      with open(proj_dir.joinpath('simulation'), 'wb') as f:
+        f.write(b'./mesh.sh\n./run.sh')
 
   def change_boundary_field(self, variable, boundary_field: BoundaryFieldDict):
     foam_file = None

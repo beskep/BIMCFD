@@ -7,8 +7,9 @@ import yaml
 from rich.logging import RichHandler
 
 TTA = True
+# todo: 로거 설정 ThermalImage 참조해서 바꾸기
 
-_righ_handler = RichHandler(level=logging.INFO, show_time=False)
+_rich_handler = RichHandler(level=logging.INFO, show_time=False)
 
 if getattr(sys, 'frozen', False) and hasattr(sys, '_MEIPASS'):
   # pyinstaller
@@ -33,7 +34,7 @@ if 'utils' not in sys.modules:
   msgs = []
 
   logging.config.dictConfig(config['logging'])
-  logging.getLogger('BIMCFD').addHandler(_righ_handler)
+  logging.getLogger('BIMCFD').addHandler(_rich_handler)
 
   try:
     from kivy.logger import Logger as kvlogger
@@ -41,7 +42,7 @@ if 'utils' not in sys.modules:
     kvlogger.handlers = [
         x for x in kvlogger.handlers if not isinstance(x, logging.StreamHandler)
     ]
-    kvlogger.addHandler(_righ_handler)
+    kvlogger.addHandler(_rich_handler)
   except ModuleNotFoundError as e:
     msgs.append(str(e))
 

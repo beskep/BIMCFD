@@ -408,27 +408,6 @@ def fuse_compound(target: Union[List, TopoDS_Shape]):
   return result
 
 
-def compare_shapes(original: TopoDS_Shape, simplified: TopoDS_Shape):
-  bbox_original = get_boundingbox(original)
-  bbox_simplified = get_boundingbox(simplified)
-
-  trsf_x = np.average([
-      np.abs(bbox_original[3] - bbox_original[0]),
-      np.abs(bbox_simplified[3] - bbox_simplified[0])
-  ])
-
-  trsf = gp_Trsf()
-  trsf.SetTranslation(gp_Vec(1.5 * trsf_x, 0.0, 0.0))
-
-  transform = BRepBuilderAPI_Transform(trsf)
-  transform.Perform(simplified, False)
-  simplified = transform.ModifiedShape(simplified)
-
-  compare = compound([original, simplified])
-
-  return compare
-
-
 def geometric_features(shape: TopoDS_Shape):
   gprops = GpropsFromShape(shape)
   exp = TopologyExplorer(shape)
@@ -511,6 +490,27 @@ def make_external_zone(shape: TopoDS_Shape,
   return zone, zone_dict
 
 
+def compare_shapes(original: TopoDS_Shape, simplified: TopoDS_Shape):
+  bbox_original = get_boundingbox(original)
+  bbox_simplified = get_boundingbox(simplified)
+
+  trsf_x = np.average([
+      np.abs(bbox_original[3] - bbox_original[0]),
+      np.abs(bbox_simplified[3] - bbox_simplified[0])
+  ])
+
+  trsf = gp_Trsf()
+  trsf.SetTranslation(gp_Vec(1.5 * trsf_x, 0.0, 0.0))
+
+  transform = BRepBuilderAPI_Transform(trsf)
+  transform.Perform(simplified, False)
+  simplified = transform.ModifiedShape(simplified)
+
+  compare = compound([original, simplified])
+
+  return compare
+
+
 def align_model(shape: TopoDS_Shape) -> TopoDS_Shape:
   """건물 모델의 주요 표면이 xyz 평면과 수평하도록 회전,
   원점 근처에 위치하도록 평행이동
@@ -580,3 +580,36 @@ def write_each_shapes(shape: TopoDS_Compound, save_dir, mkdir=False):
   for idx, solid in enumerate(solids):
     path = os.path.join(save_dir, '{}.stl'.format(idx))
     DataExchange.write_stl_file(a_shape=solid, filename=path)
+
+
+def align_obj_to_origin(path):
+  """obj 파일 bbox 최소값을 (0, 0, 0으로 변경)
+
+  Parameters
+  ----------
+  path : pathlike
+      대상 obj 파일 경로
+  """
+  with open(path, 'r') as f:
+    lines = f.readlines()
+
+  coord = []
+  line_indices = []
+
+  for idx, line in enumerate(lines):
+    if line.startswith('v '):
+      split_line = line.strip().split(' ')
+      vertex = [float(x) for x in split_line[1:]]
+      coord.append(vertex)
+      line_indices.append(idx)
+
+  coord_array = np.array(coord)
+  coord_min = np.min(coord_array, axis=0)
+
+  new_coord = coord_array - coord_min
+
+  for cidx, lidx in enumerate(line_indices):
+    lines[lidx] = 'v {:.6f} {:.6f} {:.6f}\n'.format(*new_coord[cidx])
+
+  with open(path, 'w') as f:
+    f.writelines(lines)
