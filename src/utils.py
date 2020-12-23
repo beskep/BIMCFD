@@ -6,7 +6,6 @@ from pathlib import Path
 import yaml
 from rich.logging import RichHandler
 
-TTA = True
 # todo: 로거 설정 ThermalImage 참조해서 바꾸기
 
 _rich_handler = RichHandler(level=logging.INFO, show_time=False)

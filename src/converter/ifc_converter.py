@@ -5,7 +5,7 @@ from itertools import chain, combinations
 from shutil import copy2
 from typing import Iterable, List, Tuple, Union
 
-from utils import TEMPLATE_DIR, TTA
+from utils import TEMPLATE_DIR
 
 import ifcopenshell
 import ifcopenshell.geom
@@ -270,41 +270,6 @@ class IfcConverter:
 
     return name, thickness, matched_name, conductivity, score
 
-  def openfoam_u_dict(self, surface_names, opening_names):
-    """#fixme: TTA"""
-    if not TTA:
-      raise SyntaxError
-
-    assert 'Opening_0' in opening_names
-    assert 'Opening_1' in opening_names
-
-    bfs = BoundaryFieldDict()
-    width = 15
-
-    # opening_1 (inlet)
-    bf_inlet = BoundaryFieldDict(width=width)
-    bf_inlet.add_value('type', 'fixedValue')
-    bf_inlet.add_value('value', 'uniform (0 3 0)')
-    bfs['Opening_1'] = bf_inlet
-    bfs.add_empty_line()
-
-    # opening_0 (outlet)
-    bf_outlet = BoundaryFieldDict(width=width)
-    bf_outlet.add_value('type', 'inletOutlet')
-    bf_outlet.add_value('inletValue', 'uniform (0 0 0)')
-    bf_outlet.add_value('value', 'uniform (0 0 0)')
-    bfs['Opening_0'] = bf_outlet
-    bfs.add_empty_line()
-
-    # walls
-    bf_wall = BoundaryFieldDict(width=width)
-    bf_wall.add_value('type', 'noSlip')
-    for name in surface_names:
-      bfs[name] = bf_wall
-    bfs.add_empty_line()
-
-    return bfs
-
   def openfoam_temperature_dict(self,
                                 solver,
                                 surface,
@@ -420,16 +385,6 @@ class IfcConverter:
           for mat_idx, name in enumerate(matched_names[idx]):
             bf.add_comment('Material {}: "{}"'.format(mat_idx + 1, name))
           bf.add_empty_line()
-
-      # fixme: TTA
-      if TTA and 'F02S1' in srf_name:
-        bf.add_value('type', 'wallHeatTransfer')
-        bf.add_value('Tinf', 'uniform 303.15')
-        bf.add_value('alphaWall', 'uniform 1.4')
-        bf.add_value('value', 'uniform 303.15')
-        bfs[srf_name] = bf
-        bfs.add_empty_line()
-        continue
 
       # boundary conditions
       if flag_heat_flux and is_extracted:
@@ -1103,25 +1058,10 @@ class IfcConverter:
                                            boundary_field=bf_nut)
       drop_fields.append('nut')
 
-    if TTA:
-      # fixme: TTA
-      bf_u = self.openfoam_u_dict(surface_names=wall_names,
-                                  opening_names=opening_names)
-      open_foam_case.change_boundary_field(variable='U', boundary_field=bf_u)
-      drop_fields.append('U')
-
-    if TTA:
-      self.openfoam_zero_boundary_field(case=open_foam_case,
-                                        wall_names=wall_names,
-                                        opening_names=None,
-                                        inlet_names=['Opening_1'],
-                                        outlet_names=['Opening_0'],
-                                        drop_fields=drop_fields)
-    else:
-      self.openfoam_zero_boundary_field(case=open_foam_case,
-                                        wall_names=wall_names,
-                                        opening_names=opening_names,
-                                        drop_fields=drop_fields)
+    self.openfoam_zero_boundary_field(case=open_foam_case,
+                                      wall_names=wall_names,
+                                      opening_names=opening_names,
+                                      drop_fields=drop_fields)
 
     if opt.get('max_cell_size', None):
       max_cell_size = opt['max_cell_size']
@@ -1129,10 +1069,7 @@ class IfcConverter:
       geom_info = simplified['info'][('fused_geometry' if is_simplified else
                                       'original_geometry')]
       max_cell_size = geom_info['characteristic_length'] / opt['grid_resolution']
-
-      if TTA:
-        # todo: TTA용 수정
-        max_cell_size = 1.5 * max_cell_size
+      # todo: max cell size 배율 수정?
 
     mesh_dict = self.openfoam_cf_mesh_dict(
         max_cell_size=max_cell_size,

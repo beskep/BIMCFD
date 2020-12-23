@@ -5,7 +5,7 @@ from pathlib import Path
 from shutil import copy2, rmtree
 from typing import List, Tuple
 
-from utils import TEMPLATE_DIR, TTA
+from utils import TEMPLATE_DIR
 
 from butterfly.case import Case as ButterflyCase
 from butterfly.decomposeParDict import DecomposeParDict
@@ -350,8 +350,6 @@ class OpenFoamCase(ButterflyCase):
 
     # .foam file
     foam_path = proj_dir.joinpath(self.project_name + '.foam')
-    if TTA:
-      foam_path = proj_dir.joinpath('Simulation_result.foam')
     with open(foam_path, 'w') as f:
       f.write('')
 
@@ -376,10 +374,9 @@ class OpenFoamCase(ButterflyCase):
     with open(run_path, 'wb') as f:
       f.write(run_sh)
 
-    if TTA:
-      # simulation
-      with open(proj_dir.joinpath('simulation'), 'wb') as f:
-        f.write(b'./mesh.sh\n./run.sh')
+    # simulate
+    with open(proj_dir.joinpath('simulate'), 'wb') as f:
+      f.write(b'./mesh.sh\n./run.sh')
 
   def change_boundary_field(self, variable, boundary_field: BoundaryFieldDict):
     foam_file = None

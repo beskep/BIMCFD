@@ -95,15 +95,7 @@ class BimCfdApp(BimCfdAppBase):
       spaces = self._converter.ifc.by_type('IfcSpace')
       spaces.sort(key=lambda x: x.Name)
 
-      if utils.TTA:
-        # todo: TTA
-        # spaces = [x for x in spaces if x.Name[2] == '2']
-        spaces = [x for x in spaces if x.id() < 10000]
-        if len(spaces) > 25:
-          spaces = spaces[:25]
-
       width = len(str(len(spaces) + 1))
-
       names = [
           IfcEntityText.menu_text(index=(i + 1),
                                   name=ifccnv.entity_name(entity),
@@ -251,14 +243,6 @@ class BimCfdApp(BimCfdAppBase):
 
     self._converter.save_simplified_space(simplified=simplified,
                                           path=geom_dir.as_posix())
-
-    if utils.TTA:
-      geom_files = geom_dir.rglob('*.obj')
-      for file in geom_files:
-        try:
-          align_obj_to_origin(file)
-        except Exception:
-          pass
 
     self._converter.openfoam_case(simplified=simplified,
                                   save_dir=save_dir,
