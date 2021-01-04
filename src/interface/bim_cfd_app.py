@@ -8,7 +8,6 @@ from kivy.metrics import dp
 
 from converter import ifc_converter as ifccnv
 from converter import openfoam
-from converter.geom_utils import align_obj_to_origin
 from interface import kvtools
 from interface.bim_cfd_base import BimCfdAppBase, with_spinner
 from interface.widgets import topo_widget as topo
@@ -76,9 +75,9 @@ class BimCfdApp(BimCfdAppBase):
   def load_ifc(self, path: Path):
     try:
       self._converter = ifccnv.IfcConverter(path=path.as_posix())
-    except Exception as e:
+    except Exception:
       self.show_snackbar('IFC 로드 실패')
-      self._logger.error(e)
+      self._logger.error('IFC 로드 실패', exc_info=True)
       return
 
     self.update_ifc_spaces()

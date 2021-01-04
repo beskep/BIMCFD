@@ -1,11 +1,10 @@
-import logging
 import os
 from collections import OrderedDict, defaultdict
 from itertools import chain, combinations
 from shutil import copy2
 from typing import Iterable, List, Tuple, Union
 
-from utils import TEMPLATE_DIR
+import utils
 
 import ifcopenshell
 import ifcopenshell.geom
@@ -19,8 +18,8 @@ from converter.obj_convert import ObjConverter, write_obj
 from converter.openfoam import BoundaryFieldDict, OpenFoamCase
 from converter.simplify import simplify_space
 
-PATH_MATERIAL_LAYER = TEMPLATE_DIR.joinpath('material_layer.txt')
-PATH_TEMPERATURE = TEMPLATE_DIR.joinpath('temperature.txt')
+PATH_MATERIAL_LAYER = utils.TEMPLATE_DIR.joinpath('material_layer.txt')
+PATH_TEMPERATURE = utils.TEMPLATE_DIR.joinpath('temperature.txt')
 assert PATH_MATERIAL_LAYER.exists(), PATH_MATERIAL_LAYER
 assert PATH_TEMPERATURE.exists(), PATH_MATERIAL_LAYER
 
@@ -54,7 +53,7 @@ class IfcConverter:
                wall_types=('IfcWall',),
                slab_types=('IfcSlab',),
                covering_types=('IfcCovering',)):
-    self._logger = logging.getLogger('BIMCFD')
+    self._logger = utils.get_logger()
 
     self._file_path = os.path.normpath(path)
     self._ifc = ifcopenshell.open(self._file_path)
@@ -64,7 +63,6 @@ class IfcConverter:
     self._ifc_types_wall = wall_types
     self._ifc_types_slab = slab_types
     self._ifc_types_covering = covering_types
-    self._spaces_walls = None  # TODO: 삭제
     self._storeys = None
 
     self._brep_deflection = (0.9, 0.5)
@@ -576,72 +574,6 @@ class IfcConverter:
 
       case.change_boundary_field(variable=ff.name, boundary_field=bf)
 
-  def openfoam_temperature_info(self,
-                                walls,
-                                surface_names=None,
-                                external_temperature=None,
-                                heat_transfer_coefficient=None):
-    from textwrap import indent
-
-    def _wall_name(wall):
-      if hasattr(wall, 'LongName') and wall.LongName:
-        n = '{} ({})'.format(wall.Name, wall.LongName)
-      else:
-        n = str(wall.Name)
-      return n
-
-    if external_temperature is None:
-      external_temperature = 300
-    if heat_transfer_coefficient is None:
-      heat_transfer_coefficient = '1e8'
-
-    name, thickness, matched_name, conductivity, _ = self.match_thermal_props(
-        walls)
-    with open(PATH_TEMPERATURE, 'r') as f:
-      temperature_template = f.readlines()
-    with open(PATH_MATERIAL_LAYER, 'r') as f:
-      field_template = f.readlines()
-
-    temperature_template = ''.join(temperature_template)
-    field_template = ''.join(field_template)
-
-    names = [_wall_name(x) for x in walls]
-    types = [x.is_a() for x in walls]
-
-    print('Extracting surfaces...')
-    mf = '  // material {}: "{}"\n'
-    cf = '  // Surface name: "{}"\n' \
-         '  // Surface type: "{}"\n\n' \
-         '  // Material names:\n' \
-         '{}\n' \
-         '  // Matched material names:\n' \
-         '{}'
-    fields = []
-    for idx in range(len(name)):
-      if surface_names is None:
-        surface_name = 'Surface_' + str(idx)
-      else:
-        surface_name = 'Surface_' + surface_names[idx]
-
-      name_list = [mf.format(x, y) for x, y in enumerate(name[idx])]
-      matched_list = [mf.format(x, y) for x, y in enumerate(matched_name[idx])]
-
-      comment = cf.format(names[idx], types[idx], ''.join(name_list),
-                          ''.join(matched_list))
-
-      thickness_layers = ' '.join(map(str, thickness[idx]))
-      kappa_layers = ' '.join(map(str, conductivity[idx]))
-
-      field = field_template.format(surface_name, comment, external_temperature,
-                                    heat_transfer_coefficient, thickness_layers,
-                                    kappa_layers)
-      fields.append(field)
-
-    fields = indent('\n\n'.join(fields), '  ')
-    temperature = temperature_template.format(fields)
-
-    return temperature
-
   @staticmethod
   def openfoam_cf_mesh_dict(max_cell_size=1.0,
                             min_cell_size=None,
@@ -848,7 +780,6 @@ class IfcConverter:
       for key in info_keys:
         info[key] = info['original_geometry']
 
-    # todo: valid wall names를 찾는 함수 obj_convert에 만들기
     objcnv = ObjConverter(compound=(simplified if is_simplified else shape),
                           space=space,
                           openings=openings,

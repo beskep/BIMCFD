@@ -6,9 +6,7 @@ from pathlib import Path
 import yaml
 from rich.logging import RichHandler
 
-# todo: 로거 설정 ThermalImage 참조해서 바꾸기
-
-_rich_handler = RichHandler(level=logging.INFO, show_time=False)
+LOGGER_NAME = 'BIMCFD'
 
 if getattr(sys, 'frozen', False) and hasattr(sys, '_MEIPASS'):
   # pyinstaller
@@ -25,34 +23,40 @@ _SRC_DIR = SRC_DIR.as_posix()
 if _SRC_DIR not in sys.path:
   sys.path.insert(0, _SRC_DIR)
 
-config_path = SRC_DIR.joinpath('config.yaml')
-with open(config_path, 'r', encoding='utf-8') as f:
-  config = yaml.load(f, Loader=yaml.FullLoader)
 
-if 'utils' not in sys.modules:
-  msgs = []
+def get_config():
+  config_path = SRC_DIR.joinpath('config.yaml')
+  with open(config_path, 'r', encoding='utf-8') as f:
+    config = yaml.load(f, Loader=yaml.FullLoader)
 
-  logging.config.dictConfig(config['logging'])
-  logging.getLogger('BIMCFD').addHandler(_rich_handler)
+  return config
+
+
+def get_logger() -> logging.Logger:
+  logger = logging.getLogger(LOGGER_NAME)
+
+  return logger
+
+
+if not logging.getLogger().handlers:
+  config = get_config()
+  logging.config.dictConfig(config=config['logging'])
+
+  rich_handler = RichHandler(level=logging.INFO, show_time=False)
+  logger = get_logger()
+  logger.addHandler(rich_handler)
 
   try:
     from kivy.logger import Logger as kvlogger
 
     kvlogger.handlers = [
-        x for x in kvlogger.handlers if not isinstance(x, logging.StreamHandler)
+        handler for handler in kvlogger.handlers
+        if not isinstance(handler, logging.StreamHandler)
     ]
-    kvlogger.addHandler(_rich_handler)
-  except ModuleNotFoundError as e:
-    msgs.append(str(e))
+    kvlogger.addHandler(rich_handler)
+  except ImportError:
+    logger.error('kivy logger setting error', exc_info=True)
 
-else:
-  msgs = []
-
-logger = logging.getLogger('BIMCFD')
-
-if 'utils' not in sys.modules:
-  logger.info('project dir: %s', PRJ_DIR)
-  logger.info('src dir: %s', SRC_DIR)
-
-  for msg in msgs:
-    logger.error(msg)
+  logger.info('Initialized utils')
+  logger.debug('prj dir: %s', PRJ_DIR)
+  logger.debug('src dir: %s', SRC_DIR)

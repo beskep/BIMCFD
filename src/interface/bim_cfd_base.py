@@ -1,6 +1,7 @@
-import logging
 import threading
 from pathlib import Path
+
+import utils
 
 from kivy.clock import mainthread
 from kivy.metrics import dp
@@ -60,7 +61,7 @@ class BimCfdAppBase(MDApp):
 
     super().__init__(**kwargs)
 
-    self._logger = logging.getLogger('BIMCFD')
+    self._logger = utils.get_logger()
 
     # GUI setting
     self.theme_cls.theme_style = 'Light'
