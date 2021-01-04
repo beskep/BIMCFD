@@ -1,17 +1,18 @@
 from typing import List
 
-from utils import RESOURCE_DIR
+import utils
 
 import numpy as np
 from kivy import graphics
 from kivy.app import App
+from kivy.clock import Clock
 from kivy.graphics.transformation import Matrix
 from kivy.resources import resource_find
 from kivy.uix.widget import Widget
 
 from interface.widgets.topo_mesh import TopoDsMesh
 
-_GLSL_PATH = RESOURCE_DIR.joinpath('color.glsl')
+_GLSL_PATH = utils.RESOURCE_DIR.joinpath('color.glsl')
 assert _GLSL_PATH.exists()
 
 
@@ -34,7 +35,7 @@ class BaseRenderer(Widget):
 
   ROTATE_SPEED = 1.0
   SCALE_RANGE = (0.01, 100.0)
-  SCALE_FACTOR = 2.0
+  SCALE_FACTOR = 1.5
 
   def __init__(self, **kwargs):
     super().__init__(**kwargs)
@@ -48,14 +49,13 @@ class BaseRenderer(Widget):
 
     with self.canvas:
       self.cb = graphics.Callback(self.setup_gl_context)
-      graphics.PushMatrix()
       self.setup_scene()
-      graphics.PopMatrix()
       self.cb = graphics.Callback(self.reset_gl_context)
 
-    self.update_glsl()
     self.canvas['diffuse_light'] = (1.0, 1.0, 0.8)
     self.canvas['ambient_light'] = (0.1, 0.1, 0.1)
+
+    Clock.schedule_interval(self.update_glsl, 1 / 24.0)
 
   def setup_gl_context(self, *args):
     graphics.opengl.glEnable(graphics.opengl.GL_DEPTH_TEST)
@@ -63,7 +63,7 @@ class BaseRenderer(Widget):
   def reset_gl_context(self, *args):
     graphics.opengl.glDisable(graphics.opengl.GL_DEPTH_TEST)
 
-  def update_glsl(self):
+  def update_glsl(self, *args):
     asp = self.width / float(self.height)
     proj = Matrix().view_clip(left=-asp,
                               right=asp,
@@ -73,8 +73,6 @@ class BaseRenderer(Widget):
                               far=100,
                               perspective=1)
     self.canvas['projection_mat'] = proj
-    # self.canvas['diffuse_light'] = (1.0, 1.0, 0.8)
-    # self.canvas['ambient_light'] = (0.1, 0.1, 0.1)
 
   def setup_scene(self):
     graphics.Color(1, 1, 1, 1)
@@ -91,6 +89,7 @@ class BaseRenderer(Widget):
   def rotate_angle(self, touch):
     x_angle = (touch.dx / self.width) * 360.0 * self.ROTATE_SPEED
     y_angle = (-touch.dy / self.height) * 360.0 * self.ROTATE_SPEED
+
     return x_angle, y_angle
 
   def scale_screen(self, touch):
@@ -135,44 +134,77 @@ class _TopoDsMesh:
   def mesh_vertices(self):
     return list(self.mesh_vertices_array.flatten())
 
+  def translate(self, xyz):
+    self.mesh_vertices_array[:, :3] += xyz
+    self.bbox += xyz
+
   def to_center(self, center):
     self.mesh_vertices_array[:, :3] -= center
     self.bbox -= center
 
 
 class TopoRenderer(BaseRenderer):
-  # TODO: 생성 직후 업데이트
 
-  DEFAULT_SCALE = 0.25
+  def __init__(self,
+               shapes: List[TopoDsMesh] = None,
+               default_scale=1.0,
+               near=1.0,
+               far=None,
+               perspective=1.0,
+               **kwargs):
+    """표면 Mesh 시각화 Widget
 
-  def __init__(self, shapes: List[TopoDsMesh] = None, **kwargs):
-    self.save_shapes(shapes)
+    Parameters
+    ----------
+    shapes : List[TopoDsMesh], optional
+        Shapes to visualize, by default None
+    default_scale : float, optional
+        default scale, by default 1.0
+    near : float, optional
+        (probably) coordinate of near clipping plane, by default 1.0
+    far : [None, float], optional
+        (probably) coordinate of far clipping plane, by default None
+    perspective : float, optional
+        dunno, by default 1.0
+    """
+    self._shapes: List = None
+    self._bbox: np.ndarray = None
+    self._topo_center: np.ndarray = None
+    self._depth = 1.0
+
+    self._save_shapes(shapes)
+
+    self._default_scale = default_scale
+    self._near = near
+    self._far = far
+    self._perspective = perspective
 
     super().__init__(**kwargs)
 
-  def save_shapes(self, shapes: List[TopoDsMesh] = None):
+  def _save_shapes(self, shapes: List[TopoDsMesh] = None):
     if shapes:
-      self.shapes = [_TopoDsMesh(x) for x in shapes]
+      self._shapes = [_TopoDsMesh(x) for x in shapes]
 
-      bboxs = np.vstack([x.bbox for x in self.shapes])
+      bboxs = np.vstack([x.bbox for x in self._shapes])
       bbox = np.vstack([np.min(bboxs, axis=0), np.max(bboxs, axis=0)])
       center = np.average(bbox, axis=0)
-      for shape in self.shapes:
-        shape.to_center(center)
-      self.bbox = bbox
-      self.topo_center = center
+
+      if not np.all(np.isclose(center, 0.0, rtol=0.001)):
+        # 중앙 정렬
+        bbox -= center
+        for shape in self._shapes:
+          shape.to_center(center)
+
+      self._bbox = bbox
+      self._topo_center = center
     else:
-      self.shapes = []
-      self.bbox = [[-1, -1, -1], [1, 1, 1]]
-      self.topo_center = [0, 0, 0]
+      self._shapes = []
+      self._bbox = np.array([[-1, -1, -1], [1, 1, 1]])
+      self._topo_center = np.array([0, 0, 0])
 
-  def update_glsl(self):
-    """
-    Widget의 중앙에 mesh가 표시되도록 예제를 변경
-    https://stackoverflow.com/questions/59664392/kivy-how-to-render-3d-model-in-a-given-layout
+    self._depth = np.max(self._bbox) - np.min(self._bbox)
 
-    TODO: topo 위치, 스케일 조정
-    """
+  def _boundary(self):
     app = App.get_running_app()
 
     # Calculate new left edge for the clip matrix
@@ -181,28 +213,44 @@ class TopoRenderer(BaseRenderer):
     else:
       ratio = 1.0
 
-    scene_width0 = np.abs(self.bbox[0, 0] - self.bbox[1, 0])
+    scene_width0 = np.abs(self._bbox[0, 0] - self._bbox[1, 0])
     scene_width1 = ratio * scene_width0
-    left = np.min(self.bbox[:, 0]) - (scene_width1 - scene_width0)
-    right = np.max(self.bbox[:, 0])
+    left = np.min(self._bbox[:, 0]) - (scene_width1 - scene_width0)
+    right = np.max(self._bbox[:, 0])
 
-    # calculate new top and bottom of clip frustum
-    # that maintains topo aspect ratio
-    scene_vertical_center = np.mean(self.bbox[:, 1])
-    scene_height0 = np.abs(self.bbox[0, 1] - self.bbox[1, 1])
-    scene_height1 = ratio * scene_height0
+    # calculate new top and bottom of clip frustum that maintains topo aspect ratio
+    scene_vertical_center = np.mean(self._bbox[:, 1])
+    scene_height0 = np.abs(self._bbox[0, 1] - self._bbox[1, 1])
+    scene_height1 = scene_height0 * ratio
+    # scene_height1 = scene_height0 * (self.height / self.width)
     bottom = scene_vertical_center - scene_height1 / 2.0
     top = scene_vertical_center + scene_height1 / 2.0
 
+    return left, right, top, bottom
+
+  def update_glsl(self, *args):
+    """
+    Widget의 중앙에 mesh가 표시되도록 예제를 변경
+    - https://stackoverflow.com/questions/59664392/kivy-how-to-render-3d-model-in-a-given-layout
+    - http://www.opengl-tutorial.org/beginners-tutorials/tutorial-3-matrices/#fn:projection
+    """
+    left, right, top, bottom = self._boundary()
+
     # create new clip matrix
-    far = np.abs(self.bbox[0, 2] - self.bbox[1, 2]) - self.translate.z
-    proj = Matrix().view_clip(left=left,
-                              right=right,
-                              bottom=bottom,
-                              top=top,
-                              near=1,
-                              far=far,
-                              perspective=1)
+    if self._far is None:
+      far = 2.0 * self._depth
+    else:
+      far = self._far
+
+    proj = Matrix().view_clip(
+        left=left,
+        right=right,
+        bottom=bottom,
+        top=top,
+        near=self._near,  # near clipping plane
+        far=far,  # far clipping plane
+        perspective=self._perspective)
+
     self.canvas['projection_mat'] = proj
 
   def setup_scene(self):
@@ -210,16 +258,16 @@ class TopoRenderer(BaseRenderer):
     self.roty = []
     self.scale = []
     self.mesh = []
+    z_translate = -1.5 * self._depth
 
-    for shape in self.shapes:
+    for shape in self._shapes:
       graphics.Color(*shape.color)
       graphics.PushMatrix()
-
-      self.translate = graphics.Translate(0, 0, -3)
+      graphics.Translate(0, 0, z_translate)
 
       self.rotx.append(graphics.Rotate(0, 1, 0, 0))
       self.roty.append(graphics.Rotate(0, 0, 1, 0))
-      self.scale.append(graphics.Scale(self.DEFAULT_SCALE))
+      self.scale.append(graphics.Scale(self._default_scale))
 
       graphics.UpdateNormalMatrix()
       mesh = graphics.Mesh(vertices=shape.mesh_vertices,
@@ -229,11 +277,16 @@ class TopoRenderer(BaseRenderer):
       self.mesh.append(mesh)
       graphics.PopMatrix()
 
+    for rx, ry in zip(self.rotx, self.roty):
+      rx.angle += 30.0
+      ry.angle += 30.0
+
   def on_touch_move(self, touch):
     ax, ay = self.rotate_angle(touch)
     for rx, ry in zip(self.rotx, self.roty):
       rx.angle += ay
       ry.angle += ax
+
     self.update_glsl()
 
   def scale_screen(self, touch):
@@ -250,10 +303,12 @@ class TopoRenderer(BaseRenderer):
 
 
 if __name__ == "__main__":
-  from OCC.Core.BRepPrimAPI import BRepPrimAPI_MakeBox, BRepPrimAPI_MakeCone
   from kivymd.app import MDApp
+  from kivymd.uix.boxlayout import MDBoxLayout
+  from kivymd.uix.label import MDLabel
+  from OCC.Core.BRepPrimAPI import BRepPrimAPI_MakeBox, BRepPrimAPI_MakeCone
 
-  box = BRepPrimAPI_MakeBox(1.0, 1.0, 1.0).Shape()
+  box = BRepPrimAPI_MakeBox(2.0, 1.0, 1.0).Shape()
   cone = BRepPrimAPI_MakeCone(1.2, 0.8, 0.5).Shape()
   box_mesh = TopoDsMesh(shapes=[box],
                         linear_deflection=0.1,
@@ -269,10 +324,15 @@ if __name__ == "__main__":
       self._topo_renderer = None
 
     def build(self):
-      self._topo_renderer = TopoRenderer(shapes=[box_mesh, cone_mesh])
-      return self._topo_renderer
+      self._topo_renderer = TopoRenderer(shapes=[box_mesh, cone_mesh],
+                                         default_scale=1.0,
+                                         near=0.01,
+                                         perspective=0.01)
 
-    def on_start(self):
-      self._topo_renderer.update_glsl()
+      box_layout = MDBoxLayout()
+      box_layout.add_widget(MDLabel())
+      box_layout.add_widget(self._topo_renderer)
+
+      return box_layout
 
   _RendererApp().run()

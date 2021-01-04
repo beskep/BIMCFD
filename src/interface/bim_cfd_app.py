@@ -131,7 +131,7 @@ class BimCfdApp(BimCfdAppBase):
         linear_deflection=self._converter.brep_deflection[0],
         angular_deflection=self._converter.brep_deflection[1],
         color=(1.0, 1.0, 1.0, 0.5))
-    mesh = [space_mesh]
+    meshes = [space_mesh]
 
     if openings:
       openings_mesh = topo.TopoDsMesh(
@@ -139,10 +139,14 @@ class BimCfdApp(BimCfdAppBase):
           linear_deflection=self._converter.brep_deflection[0],
           angular_deflection=self._converter.brep_deflection[1],
           color=(0.216, 0.494, 0.722, 0.5))
-      mesh.append(openings_mesh)
+      meshes.append(openings_mesh)
 
+    topo_renderer = topo.TopoRenderer(shapes=meshes,
+                                      default_scale=0.8,
+                                      near=0.01,
+                                      perspective=0.01)
     self.vis_layout.clear_widgets()
-    self.vis_layout.add_widget(topo.TopoRenderer(shapes=mesh))
+    self.vis_layout.add_widget(topo_renderer)
 
   def visualize_selected_space(self):
     space_entity = self.selected_space_entity()
