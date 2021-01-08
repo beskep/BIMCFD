@@ -140,6 +140,7 @@ cython_debug/
 # 
 .vscode
 .idea
+scripts/
 *.otf
 *.ttf
 log*

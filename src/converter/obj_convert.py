@@ -58,12 +58,12 @@ def stl_to_obj(obj_path, blender_path: Union[None, str, Path], *args):
   stl_path = [os.path.abspath(x) for x in args]
 
   if blender_path is None:
-    path = utils.config['blender_path']
+    path = utils.get_config()['blender_path']
     if not path:
       path = None
     blender_path = find_blender_path(path)
 
-  utils.logger.info('blender path: "%s"', blender_path)
+  utils.get_logger().info('blender path: "%s"', blender_path)
   if blender_path is None or not blender_path.exists():
     raise FileNotFoundError('blender의 경로를 찾을 수 없습니다. '
                             '설치하거나 src\\config.yaml에 경로를 지정해주세요.')
@@ -195,7 +195,7 @@ class ObjConverter:
           # opening의 부피를 추출
           if len(faces) != 6:
             msg = 'Opening이 직육면체 모양이 아닙니다. 추출에 오류가 발생할 수 있습니다.'
-            utils.logger.warning(msg)
+            utils.get_logger().warning(msg)
 
           # 공간과 거리가 떨어져 있는 face (= inlet / outlet) 판단
           dist = [shapes_distance(face, self._space, tol) for face in faces]
@@ -306,6 +306,7 @@ class ObjConverter:
       names = [self._wall_names[x] for x in closest]
 
     self._obj_surface = tuple((x, y) for x, y in zip(names, self._obj_surface))
+
     return
 
   def extract_faces(self,
@@ -399,6 +400,7 @@ class ObjConverter:
       names.sort()
     else:
       names = None
+
     return names
 
 
@@ -413,7 +415,7 @@ def fix_surface_name(obj_path):
     with open(obj_path) as f:
       geom = f.readlines()
   except FileNotFoundError:
-    utils.logger.error('Obj 표면 이름 변환 오류')
+    utils.get_logger().error('Obj 표면 이름 변환 오류')
     return
 
   p = re.compile(r'((\w+_[a-z0-9]+)_){2}None',

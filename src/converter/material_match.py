@@ -19,6 +19,25 @@ def load_kor_eng(path):
   return kor_eng
 
 
+def match_insulation(material, prop):
+  if prop not in ['rho', 'Cp', 'k']:
+    raise ValueError
+
+  if prop == 'rho':
+    fn = insulation.rho_material
+  elif prop == 'Cp':
+    fn = insulation.Cp_material
+  else:
+    fn = insulation.k_material
+
+  try:
+    res = fn(material)
+  except ValueError:
+    res = None
+
+  return res
+
+
 class MaterialMatch:
 
   def __init__(self, db_path=None, kor_eng_path=None):
@@ -118,11 +137,7 @@ class MaterialMatch:
                                       scorer=self._scorer)
 
     if score_ht >= score_db:
-      prop = {
-          'rho': insulation.rho_material(nearest_ht),
-          'Cp': insulation.Cp_material(nearest_ht),
-          'k': insulation.k_material(nearest_ht)
-      }
+      prop = {x: match_insulation(nearest_ht, x) for x in ['rho', 'Cp', 'k']}
       nearest_name = nearest_ht
     else:
       series = self._db.loc[self._db['Name'] == nearest_db, :].squeeze()

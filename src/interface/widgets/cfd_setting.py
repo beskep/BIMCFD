@@ -36,7 +36,7 @@ class CfdSettingContent(MDBoxLayout):
       size_hint_y: 0.6
       MDBoxLayout:
         MDCheckbox:
-          active: True
+          active: False
           size_hint_x: None
           id: flag_heat_flux
         MDLabel:

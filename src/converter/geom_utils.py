@@ -65,7 +65,7 @@ def fix_shape(shape: TopoDS_Shape, precision=None):
   fix.Init(shape)
 
   if precision:
-    fix.Precision(precision)
+    fix.SetPrecision(precision)
 
   fix.Perform()
 
@@ -613,3 +613,30 @@ def align_obj_to_origin(path):
 
   with open(path, 'w') as f:
     f.writelines(lines)
+
+
+def outer_components(shape, target='face', hash_upper=1e8):
+  if target not in ('face', 'edge'):
+    raise ValueError(target)
+
+  hash_upper = int(hash_upper)
+  comp_solid = defaultdict(int)
+
+  exp = TopologyExplorer(shape)
+  for solid in exp.solids():
+    if target == 'face':
+      it = TopologyExplorer(solid).faces()
+    else:
+      it = TopologyExplorer(solid).edges()
+
+    for comp in it:
+      comp_solid[comp.HashCode(hash_upper)] += 1
+
+  if target == 'face':
+    it = exp.faces()
+  else:
+    it = exp.edges()
+
+  res = [x for x in it if comp_solid[x.HashCode(hash_upper)] == 1]
+
+  return res

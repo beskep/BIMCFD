@@ -1,4 +1,15 @@
 ï»¿Category,Manufacturer,Name,Conductivity {W/m-K},Thermal Diffusivity [mm2/s],Specific Heat {J/kg-K},Thermal Effusivity [Ws0.5/m2?K],Density {kg/m3},Roughness,Thermal Absorptance,Solar Absorptance,Visible Absorptance,Source,Date
+default,-,default,0.5624888,-,626.8238,-,1681.9386,Mediumsoooth,0.9,0.7,0.7,-,-
+default,-,unnamed,0.5624888,-,626.8238,-,1681.9386,Mediumsoooth,0.9,0.7,0.7,-,-
+default,-,ceiling,0.5624888,-,626.8238,-,1681.9386,Mediumsoooth,0.9,0.7,0.7,-,-
+default,-,slab,0.5624888,-,626.8238,-,1681.9386,Mediumsoooth,0.9,0.7,0.7,-,-
+default,-,plastic,0.23,0.11,1464,692,1420,Mediumsoooth,0.9,0.7,0.7,-,-
+default,-,metal,71.965,20.4,448,15924,7870,Mediumsoooth,0.9,0.7,0.7,-,-
+default,-,frame,71.965,20.4,448,15924,7870,Mediumsoooth,0.9,0.7,0.7,-,-
+default,-,wood,0.151,0.12,2301,437,550,Mediumsoooth,0.9,0.7,0.7,-,-
+default,-,bamboo,0.151,0.12,2301,437,550,Mediumsoooth,0.9,0.7,0.7,-,-
+default,-,door,0.151,0.12,2301,437,550,Mediumsoooth,0.9,0.7,0.7,-,-
+default,-,finish,0.151,0.12,2301,437,550,Mediumsoooth,0.9,0.7,0.7,-,-
 Raw material,Thermtest,1-dodecene,0.14,0.0856,2150,478.5,761,Mediumsoooth,0.9,0.7,0.7,MATERIALS THERMAL PROPERTIES DATABASE(https://thermtest.com/materials-database),2018
 Plastic ,Thermtest,abs resin (high k),0.209,0.13,1506,572,1040,Mediumsoooth,0.9,0.7,0.7,MATERIALS THERMAL PROPERTIES DATABASE(https://thermtest.com/materials-database),2018
 Plastic ,Thermtest,abs resin (low k),0.138,0.09,1506,465,1040,Mediumsoooth,0.9,0.7,0.7,MATERIALS THERMAL PROPERTIES DATABASE(https://thermtest.com/materials-database),2018
@@ -1007,8 +1018,8 @@ Metal Plastic ,Thermtest,uranium oxide (UO2) (polyxtal 97 dens),10.042,3.9,243,5
 Metal Solid ,Thermtest,uranium oxide (UO2) (single crystal),10.46,3.93,243,5275,10960,Mediumsoooth,0.9,0.7,0.7,MATERIALS THERMAL PROPERTIES DATABASE(https://thermtest.com/materials-database),2018
 Metal ,Thermtest,uranium oxide + cr (UO2 8Ovol) (97 d),15.899,4.75,335,7295,10000,Mediumsoooth,0.9,0.7,0.7,MATERIALS THERMAL PROPERTIES DATABASE(https://thermtest.com/materials-database),2018
 Metal ,Thermtest,uranium oxide + mo (UO2 70 vol) (92 d),20.083,6,335,8199,10000,Mediumsoooth,0.9,0.7,0.7,MATERIALS THERMAL PROPERTIES DATABASE(https://thermtest.com/materials-database),2018
-Metal ,Thermtest,uranium oxide + mo (UO2 ?˜¯ vol) (91 d),13.807,4.13,335,6798,10000,Mediumsoooth,0.9,0.7,0.7,MATERIALS THERMAL PROPERTIES DATABASE(https://thermtest.com/materials-database),2018
-Metal ,Thermtest,uranium oxide + mo (UO2 ?˜¯ vol) (94 d),18.41,5.5,335,7850,10000,Mediumsoooth,0.9,0.7,0.7,MATERIALS THERMAL PROPERTIES DATABASE(https://thermtest.com/materials-database),2018
+Metal ,Thermtest,uranium oxide + mo (UO2 ? vol) (91 d),13.807,4.13,335,6798,10000,Mediumsoooth,0.9,0.7,0.7,MATERIALS THERMAL PROPERTIES DATABASE(https://thermtest.com/materials-database),2018
+Metal ,Thermtest,uranium oxide + mo (UO2 ? vol) (94 d),18.41,5.5,335,7850,10000,Mediumsoooth,0.9,0.7,0.7,MATERIALS THERMAL PROPERTIES DATABASE(https://thermtest.com/materials-database),2018
 Metal ,Thermtest,uranium oxide + nb (UO2 80 vol),9.623,2.88,335,5675,10000,Mediumsoooth,0.9,0.7,0.7,MATERIALS THERMAL PROPERTIES DATABASE(https://thermtest.com/materials-database),2018
 Metal ,Thermtest,uranium oxide + st steel (UO2 70 vol),7.95,2.38,335,5158,10000,Mediumsoooth,0.9,0.7,0.7,MATERIALS THERMAL PROPERTIES DATABASE(https://thermtest.com/materials-database),2018
 Metal ,Thermtest,uranium oxide + st steel (UO2 80 vol),6.276,1.88,335,4583,10000,Mediumsoooth,0.9,0.7,0.7,MATERIALS THERMAL PROPERTIES DATABASE(https://thermtest.com/materials-database),2018

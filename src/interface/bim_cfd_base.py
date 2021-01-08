@@ -412,7 +412,9 @@ class BimCfdAppBase(MDApp):
     self.geom_table_layout.add_widget(data_table)
 
   def add_material_table(self, column_data, row_data):
-    data_table = MDDataTable(column_data=column_data, row_data=row_data)
+    data_table = MDDataTable(column_data=column_data,
+                             row_data=row_data,
+                             rows_num=len(row_data))
     data_table.pos_hint = {'center_x': 0.5, 'center_y': 0.5}
 
     self.material_table_layout.add_widget(data_table)

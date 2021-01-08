@@ -1,11 +1,10 @@
-import logging
 from collections import OrderedDict, namedtuple
 from itertools import chain
 from pathlib import Path
 from shutil import copy2, rmtree
 from typing import List, Tuple
 
-from utils import TEMPLATE_DIR
+import utils
 
 from butterfly.case import Case as ButterflyCase
 from butterfly.decomposeParDict import DecomposeParDict
@@ -32,13 +31,14 @@ _SOLVERS_ENERGY = (
     'buoyantSimpleFoam',
     'buoyantBousinessqSimpleFoam',
 )
-_SOLVERS_CONDUCTIVITY = ('buoyantSimpleFoam',)
+# _SOLVERS_CONDUCTIVITY = ('buoyantSimpleFoam',)
+_SOLVERS_CONDUCTIVITY = tuple()  # fixme: buoyantSimpleFoam에 열전도 적용 안됨
 _SOLVERS_TURBULENCE = (
     'simpleFoam',
     'buoyantSimpleFoam',
     'buoyantBousinessqSimpleFoam',
 )
-_SOLVER_PATH = {x.lower(): TEMPLATE_DIR.joinpath(x) for x in _SOLVERS}
+_SOLVER_PATH = {x.lower(): utils.TEMPLATE_DIR.joinpath(x) for x in _SOLVERS}
 for x in _SOLVER_PATH.values():
   assert x.exists(), x
 
@@ -137,7 +137,7 @@ class BoundaryFieldDict(OrderedDict):
 
 
 class OpenFoamCase(ButterflyCase):
-  logger = logging.getLogger('BIMCFD')
+  logger = utils.get_logger()
 
   SUBFOLDERS = ('0', 'constant', 'constant\\polyMesh', 'system')
 

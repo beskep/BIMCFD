@@ -85,7 +85,7 @@ class IfcConverter:
     self.tol_cut = 0.0
 
     self._material_match = None
-    self._min_match_score = None
+    self._min_match_score = 20
 
   @property
   def ifc(self) -> ifcopenshell.file:
@@ -195,6 +195,7 @@ class IfcConverter:
       inter = spaces_walls[sp1] & spaces_walls[sp2]
       if inter:
         intersection[(sp1, sp2)] = inter
+
     return intersection
 
   def get_openings(self, wall: IfcEntity):
@@ -205,10 +206,11 @@ class IfcConverter:
       try:
         shape = self.create_geometry(opening.RelatedOpeningElement)
         shapes.append(shape)
-      except RuntimeError as e:
-        msg = ('Opening 추출 실패:\n{}\n{}\n{}'.format(
-            self.file_path, opening.RelatedOpeningElement, e))
-        self._logger.warning(msg)
+      except RuntimeError:
+        self._logger.warning('Opening 추출 실패:%s\n%s',
+                             self.file_path,
+                             opening.RelatedOpeningElement,
+                             exc_info=True)
 
     return shapes
 
@@ -232,6 +234,7 @@ class IfcConverter:
       return None
 
     layers_info = [(x.Material.Name, x.LayerThickness / 1000.0) for x in layer]
+
     return layers_info
 
   def _match_thermal_helper(self, layer, match_dict):
@@ -243,18 +246,23 @@ class IfcConverter:
 
     return matched_name, conductivity, score
 
-  def match_thermal_props(self, walls, remove_na=True):
+  def match_thermal_propes(self, walls, remove_na=True):
     layer_info = [self._layers_info(x) for x in walls]
-    layer_info_without_na = [x for x in layer_info if x is not None]
+    layer_info_wo_na = [x for x in layer_info if x is not None]
     if remove_na:
-      layer_info = layer_info_without_na
+      layer_info = layer_info_wo_na
 
     unique_names = set(
-        x[0].lower() for x in chain.from_iterable(layer_info_without_na))
+        x[0].lower() for x in chain.from_iterable(layer_info_wo_na))
     match_dict = {
         x: self.materiam_match.thermal_properties(x) for x in unique_names
     }
 
+    return layer_info, match_dict
+
+  def match_thermal_props_by_layer(self, walls, remove_na=True):
+    layer_info, match_dict = self.match_thermal_propes(walls=walls,
+                                                       remove_na=remove_na)
     matched = [
         self._match_thermal_helper(x, match_dict) if x else x
         for x in layer_info
@@ -325,7 +333,7 @@ class IfcConverter:
     except TypeError:
       pass
 
-    names, thickness, matched_names, conductivity, score = self.match_thermal_props(
+    names, thickness, matched_names, conductivity, score = self.match_thermal_props_by_layer(
         surface, remove_na=False)
     assert len(surface) == len(names)
 
@@ -460,6 +468,7 @@ class IfcConverter:
     material_name = [x[1] for x in friction_match]
     matched_name = [x[2] for x in friction_match]
     score = [x[3] for x in friction_match]
+    score = [0 if x is None else x for x in score]
 
     turbulence = OpenFoamCase.is_turbulence_available(solver)
     bfs = BoundaryFieldDict()
@@ -494,17 +503,17 @@ class IfcConverter:
         bf.add_empty_line()
 
         bf.add_value('type', 'nutURoughWallFunction')
-        bf.add_value('roughnessHeight', roughness[idx])
-        bf.add_value('roughnessConstant', roughness_constant)
-        bf.add_value('roughnessFactor',
-                     roughness_factor)  # fixme: semicolon 추가 안됨
+        bf.add_value('roughnessHeight', str(roughness[idx]))
+        bf.add_value('roughnessConstant', str(roughness_constant))
+        bf.add_value('roughnessFactor', str(roughness_factor))
       else:
         if turbulence and not is_extracted:
           bf.add_comment('Material not matched')
           bf.add_empty_line()
 
         bf.add_value('type', 'nutkWallFunction')
-        bf.add_value('value', '$internalField')
+
+      bf.add_value('value', 'uniform 0')
 
       bfs[srf_name] = bf
       bfs.add_empty_line()
@@ -651,7 +660,7 @@ class IfcConverter:
         set(chain.from_iterable([self.get_openings(w) for w in walls])))
 
     if len(targets) == 1 and not openings:
-      shape = ifcopenshell.geom.create_shape(self.settings, targets[0]).geometry
+      shape = self.create_geometry(targets[0])
       space = shape
     else:
       shape = TopoDS_Compound()
@@ -668,8 +677,8 @@ class IfcConverter:
           builder_shape.Add(shape, solid)
           builder_space.Add(space, solid)
         except RuntimeError as e:
-          raise ValueError('Shape 변환 실패:\n{}\n{}\n{}'.format(
-              self.file_path, target, e)) from e
+          raise ValueError('Shape 변환 실패:\n{}\n{}'.format(
+              self.file_path, target)) from e
 
       distance = [geom_utils.shapes_distance(shape, op, tol) for op in openings]
       openings = [
@@ -967,6 +976,9 @@ class IfcConverter:
 
     drop_fields = []
     if OpenFoamCase.is_energy_available(solver) and opt['flag_energy']:
+      heat_transfer_coefficient = opt.get('heat_transfer_coefficient', '1e8')
+      if heat_transfer_coefficient is None:
+        heat_transfer_coefficient = '1e8'
       bf_t = self.openfoam_temperature_dict(
           solver=solver,
           surface=simplified['walls'],
@@ -974,7 +986,8 @@ class IfcConverter:
           opening_names=opening_names,
           min_score=self.minimum_match_score,
           temperature=opt.get('external_temperature', 300),
-          heat_transfer_coefficient=opt.get('heat_transfer_coefficient', '1e8'))
+          heat_flux=opt.get('flag_heat_flux', True),
+          heat_transfer_coefficient=heat_transfer_coefficient)
       open_foam_case.change_boundary_field(variable='T', boundary_field=bf_t)
       drop_fields.append('T')
 

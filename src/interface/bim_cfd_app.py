@@ -16,8 +16,18 @@ from interface.widgets import topo_widget as topo
 def _itc(geom_info: dict):
   itc = (3.0 / geom_info['face_count'] + 6.0 / geom_info['edge_count'])
   itc = min(1.0, itc)
+  itc = '{:.2e}'.format(itc)
 
   return itc
+
+
+def _fmt(value, fmt='.2f'):
+  if not value:
+    res = 'NA'
+  else:
+    res = '{:{}}'.format(value, fmt)
+
+  return res
 
 
 class IfcEntityText:
@@ -202,16 +212,14 @@ class BimCfdApp(BimCfdAppBase):
     self.execute_button.disabled = False
     self.show_snackbar('형상 전처리 완료', duration=1.0)
 
-  @mainthread
-  def show_simplification_results(self):
-    simplified = self._simplified
-    if not simplified:
-      self.show_snackbar('형상 전처리 필요')
-      return
-
-    # TODO: 표 다듬기
+  def show_geom_info(self, simplified):
+    # TODO: 표 다듬기 - 중앙 정렬
     # todo: 단순화된 형상의 face 개수 증가하는 문제 해결 (un-brep/tessellation?)
-    geom_cols = [('변수', dp(50)), ('전처리 전', dp(50)), ('전처리 후', dp(50))]
+    geom_cols = [
+        ('변수', dp(50)),
+        ('전처리 전', dp(50)),
+        ('전처리 후', dp(50)),
+    ]
     geom_orig: dict = simplified['info']['original_geometry']
     geom_simp: dict = simplified['info']['fused_geometry']
     if geom_simp is None:
@@ -220,18 +228,63 @@ class BimCfdApp(BimCfdAppBase):
         geom_simp = dict()
 
     geom_vars = list(geom_orig.keys())
-    geom_rows = [(self._geom_vars_kor[x], geom_orig[x], geom_simp.get(x, 'NA'))
-                 for x in geom_vars
-                 if x in self._geom_vars_kor]
+    geom_rows = [(
+        self._geom_vars_kor[x],
+        _fmt(geom_orig[x]),
+        _fmt(geom_simp.get(x, None)),
+    ) for x in geom_vars if x in self._geom_vars_kor]
     geom_rows.append(
         ('Inverse Topology Count', _itc(geom_orig), _itc(geom_simp)))
 
     self.geom_table_layout.clear_widgets()
     self.add_geom_table(column_data=geom_cols, row_data=geom_rows)
 
-    geom = simplified['simplified']
+  def show_material_info(self, simplified):
+    walls = simplified['walls']
+    _, match_dict = self._converter.match_thermal_propes(walls=walls)
+
+    materials = sorted(list(match_dict.keys()))
+
+    cols = [
+        ('재료\n(원본)', dp(40)),
+        ('재료\n(매치)', dp(40)),
+        ('열전도율\n(W/mK)', dp(20)),
+        ('밀도\n(kg/m³)', dp(20)),
+        ('비열\n(J/kg·K)', dp(20)),
+    ]
+
+    def _row(material):
+      props = match_dict[material][0]
+      matched_name = match_dict[material][2]
+      row = (
+          material,
+          matched_name,
+          _fmt(props['k'], '.3e'),
+          _fmt(props['rho'], '.3e'),
+          _fmt(props['Cp'], '.3e'),
+      )
+
+      return row
+
+    rows = [_row(material) for material in materials]
+
+    self.material_table_layout.clear_widgets()
+    self.add_material_table(column_data=cols, row_data=rows)
+
+  @mainthread
+  def show_simplification_results(self):
+    simplified = self._simplified
+    if not simplified:
+      self.show_snackbar('형상 전처리 필요')
+      return
+
+    # todo: outer faces, edges 개수만 표시하기
+    self.show_geom_info(simplified)
+    self.show_material_info(simplified)
+
+    geom = simplified['fused']
     if geom is None:
-      geom = simplified['shape']
+      geom = simplified['original']
 
     self.visualize_topology(spaces=[geom])
 

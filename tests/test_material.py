@@ -1,6 +1,20 @@
-import os
+import sys
+from pathlib import Path
+
+_PARENT = Path(__file__).parent.resolve()
+
+PRJ_DIR = _PARENT.parent
+SRC_DIR = PRJ_DIR.joinpath('src')
+
+RESOURCE_DIR = SRC_DIR.joinpath('resource')
+TEMPLATE_DIR = SRC_DIR.joinpath('template')
+
+_SRC_DIR = SRC_DIR.as_posix()
+if SRC_DIR not in sys.path:
+  sys.path.insert(0, _SRC_DIR)
 
 import pytest
+
 from converter import material_match as mat
 
 
@@ -98,16 +112,17 @@ def test_thermal_properties_from_ht(material: mat.MaterialMatch):
 
 
 def test_material_list():
-  from ht import insulation
-  from fluids import friction
   from pathlib import Path
+
+  from fluids import friction
+  from ht import insulation
 
   roughness = list(friction._all_roughness.keys())
   thermal = list(insulation.materials_dict.keys())
 
   result_dir = Path(r'D:\CFD\test\material')
   if not result_dir.exists():
-    os.makedirs(str(result_dir))
+    result_dir.mkdir(parents=True)
 
   with open(result_dir / 'dict_roughness.txt', 'w') as f:
     f.write('\n'.join(roughness))
@@ -116,5 +131,5 @@ def test_material_list():
 
 
 if __name__ == '__main__':
-  # kor_eng_material()
-  pytest.main(['-v', '-k', 'test_material.py'])
+  test_material_list()
+  # pytest.main(['-v', '-k', 'test_material'])
