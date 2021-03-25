@@ -9,6 +9,8 @@ class TextFieldFont(MDTextField):
 
   def __init__(self, **kwargs):
     self.has_had_text = False
+    self.error = None
+    self.helper_text = None
     super().__init__(**kwargs)
 
   def on_font_name(self, instance, value):
