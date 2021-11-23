@@ -1,6 +1,9 @@
 # -*- mode: python ; coding: utf-8 -*-
 import os
 import sys
+from pathlib import Path
+
+from PyInstaller import compat
 
 sys.setrecursionlimit(5000)
 
@@ -10,12 +13,15 @@ if SRC_DIR not in sys.path:
 
 from kivymd import hooks_path
 
+mkldir = Path(compat.base_prefix).joinpath('Library/bin')
+mklbins = [(x.as_posix(), '.') for x in mkldir.glob('mkl*.dll')]
+
 block_cipher = None
 
 a = Analysis(['BIMCFD.py'],
              pathex=['D:\\Python\\BIMCFD'],
-             binaries=[],
-             datas=[('src\\', 'src\\')],
+             binaries=mklbins,
+             datas=[('resource\\', 'resource\\')],
              hiddenimports=['kivymd.stiffscroll'],
              hookspath=[hooks_path, SRC_DIR],
              runtime_hooks=[],

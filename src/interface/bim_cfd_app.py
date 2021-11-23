@@ -338,8 +338,8 @@ class BimCfdApp(BimCfdAppBase):
 
 
 def main():
-  font_regular = utils.RESOURCE_DIR.joinpath('NotoSansCJKkr-Medium.otf')
-  font_bold = utils.RESOURCE_DIR.joinpath('NotoSansCJKkr-Bold.otf')
+  font_regular = utils.DIR.RESOURCE.joinpath('NotoSansCJKkr-Medium.otf')
+  font_bold = utils.DIR.RESOURCE.joinpath('NotoSansCJKkr-Bold.otf')
 
   kvtools.register_font(name='NotoSansKR',
                         fn_regular=font_regular.as_posix(),
@@ -347,7 +347,7 @@ def main():
   kvtools.config()
   kvtools.set_window_size(size=(1280, 720))
 
-  kv_dir = utils.SRC_DIR.joinpath('./interface/kvs')
+  kv_dir = utils.DIR.RESOURCE.joinpath('kvs')
   kvs = [
       'bim_cfd',
       'file_panel',

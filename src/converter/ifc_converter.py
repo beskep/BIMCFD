@@ -19,10 +19,10 @@ from converter.obj_convert import ObjConverter, write_obj
 from converter.openfoam import BoundaryFieldDict, OpenFoamCase
 from converter.simplify import simplify_space
 
-PATH_MATERIAL_LAYER = utils.TEMPLATE_DIR.joinpath('material_layer.txt')
-PATH_TEMPERATURE = utils.TEMPLATE_DIR.joinpath('temperature.txt')
-assert PATH_MATERIAL_LAYER.exists(), PATH_MATERIAL_LAYER
-assert PATH_TEMPERATURE.exists(), PATH_MATERIAL_LAYER
+PATH_MATERIAL_LAYER = utils.DIR.TEMPLATE.joinpath('material_layer.txt')
+PATH_TEMPERATURE = utils.DIR.TEMPLATE.joinpath('temperature.txt')
+PATH_MATERIAL_LAYER.stat()
+PATH_TEMPERATURE.stat()
 
 
 def to_openfoam_vector(values):

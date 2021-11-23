@@ -1,7 +1,7 @@
 import json
 import re
 
-from utils import RESOURCE_DIR
+from utils import DIR
 
 import pandas as pd
 from fuzzywuzzy import fuzz
@@ -10,8 +10,8 @@ from fuzzywuzzy.process import extractOne
 from fluids import friction
 from ht import insulation
 
-DB_PATH = RESOURCE_DIR.joinpath('material.csv')
-KOR_ENG_PATH = RESOURCE_DIR.joinpath('material_kor_eng.json')
+DB_PATH = DIR.RESOURCE.joinpath('material.csv')
+KOR_ENG_PATH = DIR.RESOURCE.joinpath('material_kor_eng.json')
 
 
 def load_kor_eng(path):

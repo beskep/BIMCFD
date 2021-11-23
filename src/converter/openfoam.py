@@ -40,7 +40,7 @@ _SOLVERS_TURBULENCE = (
     'buoyantSimpleFoam',
     'buoyantBousinessqSimpleFoam',
 )
-_SOLVER_PATH = {x.lower(): utils.TEMPLATE_DIR.joinpath(x) for x in _SOLVERS}
+_SOLVER_PATH = {x.lower(): utils.DIR.TEMPLATE.joinpath(x) for x in _SOLVERS}
 for x in _SOLVER_PATH.values():
   assert x.exists(), x
 

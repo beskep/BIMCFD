@@ -18,7 +18,7 @@
             MDBoxLayout:
                 # padding: dp(10)
                 spacing: dp(10)
-            
+
                 MDLabel:
                     text: 'CFD Solver'
                     size_hint_x: 1
@@ -27,14 +27,14 @@
                     text: 'buoyantSimpleFoam'
                     size_hint_x: 3
                     width_mult: 7
-                
+
             MDBoxLayout:
                 spacing: dp(10)
-        
+
                 MDRaisedButton:
                     text: 'CFD 설정'
                     on_release: app.cfd_dialog.open()
-            
+
                 MDRaisedButton:
                     id: execute
                     text: '변 환'

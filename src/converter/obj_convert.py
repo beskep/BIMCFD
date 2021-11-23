@@ -24,18 +24,14 @@ from OCCUtils.Construct import compound
 
 BLENDER_FOUNDATION_PATH = Path(r'C:\Program Files\Blender Foundation')
 
-EMPTY_BLEND_PATH = utils.RESOURCE_DIR.joinpath('empty.blend')
-BLENDER_SCRIPT_PATH = utils.SRC_DIR.joinpath('converter/blender.py')
-assert EMPTY_BLEND_PATH.exists(), EMPTY_BLEND_PATH
-assert BLENDER_SCRIPT_PATH.exists(), BLENDER_SCRIPT_PATH
+EMPTY_BLEND_PATH = utils.DIR.RESOURCE.joinpath('empty.blend')
+BLENDER_SCRIPT_PATH = utils.DIR.RESOURCE.joinpath('blender.py')
+EMPTY_BLEND_PATH.stat()
+BLENDER_SCRIPT_PATH.stat()
 
 
 def find_blender_path(path=None):
-  if path is None:
-    path = BLENDER_FOUNDATION_PATH
-  else:
-    path = Path(path)
-
+  path = Path(path) if path else BLENDER_FOUNDATION_PATH
   if not path.exists():
     res = None
   else:
@@ -58,16 +54,10 @@ def stl_to_obj(obj_path, blender_path: Union[None, str, Path], *args):
   obj_path = os.path.abspath(obj_path)
   stl_path = [os.path.abspath(x) for x in args]
 
-  if blender_path is None:
-    path = utils.get_config()['blender_path']
-    if not path:
-      path = None
-    blender_path = find_blender_path(path)
-
+  blender_path = find_blender_path(blender_path)
   logger.info('blender path: "{}"', blender_path)
   if blender_path is None or not blender_path.exists():
-    raise FileNotFoundError('blender의 경로를 찾을 수 없습니다. '
-                            '설치하거나 src\\config.yaml에 경로를 지정해주세요.')
+    raise FileNotFoundError('blender의 경로를 찾을 수 없습니다.')
 
   run_args = [
       blender_path.as_posix(),
