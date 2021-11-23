@@ -4,9 +4,10 @@ import re
 from utils import RESOURCE_DIR
 
 import pandas as pd
-from fluids import friction
 from fuzzywuzzy import fuzz
 from fuzzywuzzy.process import extractOne
+
+from fluids import friction
 from ht import insulation
 
 DB_PATH = RESOURCE_DIR.joinpath('material.csv')

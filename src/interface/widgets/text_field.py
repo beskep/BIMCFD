@@ -1,6 +1,7 @@
 import os.path
 
 from kivy.properties import BooleanProperty, ObjectProperty, StringProperty
+
 from kivymd.uix.boxlayout import MDBoxLayout
 from kivymd.uix.textfield import MDTextField
 
@@ -9,8 +10,8 @@ class TextFieldFont(MDTextField):
 
   def __init__(self, **kwargs):
     self.has_had_text = False
-    self.error = None
-    self.helper_text = None
+    self.error = False
+    self.helper_text = ''
     super().__init__(**kwargs)
 
   def on_font_name(self, instance, value):

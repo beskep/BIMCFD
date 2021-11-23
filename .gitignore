@@ -137,10 +137,11 @@ dmypy.json
 # Cython debug symbols
 cython_debug/
 
-# 
+# project
 .vscode
 .idea
 scripts/
 *.otf
 *.ttf
-log*
+.*.py
+tests/data

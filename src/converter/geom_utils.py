@@ -26,10 +26,11 @@ from OCC.Core.TopoDS import (TopoDS_Compound, TopoDS_Face, TopoDS_Shape,
 from OCC.Core.TopTools import TopTools_ListOfShape
 from OCC.Extend import DataExchange
 from OCC.Extend.TopologyUtils import TopologyExplorer
+from tqdm import tqdm
+
 from OCCUtils.Common import GpropsFromShape
 from OCCUtils.Construct import compound, face_normal, make_plane
 from OCCUtils.face import Face
-from tqdm import tqdm
 
 # todo: tqdm 지우기
 

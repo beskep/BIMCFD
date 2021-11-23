@@ -11,12 +11,12 @@ from OCC.Core.BRepMesh import BRepMesh_IncrementalMesh
 from OCC.Core.gp import gp_Pnt, gp_Vec
 from OCC.Core.TopoDS import TopoDS_Face, TopoDS_Shape
 from OCC.Extend.TopologyUtils import TopologyExplorer
-from OCCUtils.Common import GpropsFromShape
-from OCCUtils.Construct import compound, make_plane
-from OCCUtils.face import Face
 from scipy.spatial import ConvexHull
 
 from converter import geom_utils
+from OCCUtils.Common import GpropsFromShape
+from OCCUtils.Construct import compound, make_plane
+from OCCUtils.face import Face
 
 
 def flat_face_info(faces: List[TopoDS_Shape]):

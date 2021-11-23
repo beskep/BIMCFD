@@ -6,6 +6,8 @@ import utils
 from kivy.clock import mainthread
 from kivy.metrics import dp
 from kivy.uix.widget import Widget, WidgetException
+from loguru import logger
+
 from kivymd.app import MDApp
 from kivymd.uix.bottomnavigation import MDBottomNavigation
 from kivymd.uix.boxlayout import MDBoxLayout
@@ -15,10 +17,10 @@ from kivymd.uix.filemanager import MDFileManager
 from kivymd.uix.snackbar import Snackbar
 from kivymd.uix.spinner import MDSpinner
 
-from interface.widgets.cfd_setting import CfdSettingDialog
-from interface.widgets.drop_down import DropDownMenu
-from interface.widgets.panel_title import PanelTitle
-from interface.widgets.text_field import TextFieldPath, TextFieldUnit
+from .widgets.cfd_setting import CfdSettingDialog
+from .widgets.drop_down import DropDownMenu
+from .widgets.panel_title import PanelTitle
+from .widgets.text_field import TextFieldPath, TextFieldUnit
 
 _FONT_STYLES = ('H1', 'H2', 'H3', 'H4', 'H5', 'H6', 'Subtitle1', 'Subtitle2',
                 'Body1', 'Body2', 'Button', 'Caption', 'Overline')
@@ -60,8 +62,6 @@ class BimCfdAppBase(MDApp):
     self.built = None
 
     super().__init__(**kwargs)
-
-    self._logger = utils.get_logger()
 
     # GUI setting
     self.theme_cls.theme_style = 'Light'
@@ -106,7 +106,7 @@ class BimCfdAppBase(MDApp):
 
     if not root:
       msg = '{} failed to build'.format(__class__.__name__)
-      self._logger.error(msg)
+      logger.error(msg)
       raise WidgetException(msg)
 
     self.root = root
@@ -208,10 +208,11 @@ class BimCfdAppBase(MDApp):
     elif mode == 'save':
       cur_dir = self._save_dir
       ext = []
-      search = 'dirs'
+      # search = 'dirs'
+      search = 'all'  # fixme
     else:
       msg = 'file_manager.mode ({}) not in ["bim", "save"]'.format(mode)
-      self._logger.error(msg)
+      logger.error(msg)
       raise ValueError(msg)
 
     self.file_manager.mode = mode
@@ -244,7 +245,7 @@ class BimCfdAppBase(MDApp):
 
     else:
       msg = 'file_manager.mode ({}) not in ["bim", "save"]'.format(mode)
-      self._logger.error(msg)
+      logger.error(msg)
       raise ValueError(msg)
 
     self.exit_file_manager()
@@ -329,7 +330,7 @@ class BimCfdAppBase(MDApp):
         value = float(field.get_main_text())
       except ValueError:
         msg = '[{}] 설정값이 올바르지 않습니다.'.format(label)
-        self._logger.warning(msg)
+        logger.warning(msg)
         self.show_snackbar(msg)
         return None
 
@@ -388,13 +389,16 @@ class BimCfdAppBase(MDApp):
       self._snackbar.duration = duration
 
     try:
-      self._snackbar.open()
+      if hasattr(self._snackbar, 'open'):
+        self._snackbar.open()
+      else:
+        self._snackbar.show()
     except WidgetException:
       # 이미 보이는 (animation 중인) snackbar가 존재함
       # 이번 요청은 무시
       pass
 
-    self._logger.info('[Snackbar] %s', message)
+    logger.info('[Snackbar] {}', message)
 
   @mainthread
   def activate_spinner(self, active=True):

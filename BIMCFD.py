@@ -7,4 +7,6 @@ from src.converter import ifc_converter, simplify
 from src.interface import bim_cfd_app, bim_cfd_base
 from src.OCCUtils import Common, Construct, edge, face
 
-bim_cfd_app.main()
+if __name__ == '__main__':
+  utils.set_logger()
+  bim_cfd_app.main()

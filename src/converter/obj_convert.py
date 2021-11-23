@@ -10,16 +10,17 @@ from typing import Collection, Iterable, Union
 import utils
 
 import numpy as np
+from loguru import logger
 from OCC.Core.BRepAlgo import BRepAlgo_Common
 from OCC.Core.BRepBuilderAPI import BRepBuilderAPI_MakeVertex
 from OCC.Core.TopoDS import TopoDS_Compound, TopoDS_Shape
 from OCC.Extend.DataExchange import write_stl_file
 from OCC.Extend.TopologyUtils import TopologyExplorer
-from OCCUtils.Common import GpropsFromShape
-from OCCUtils.Construct import compound
 
 from converter.geom_utils import get_boundingbox, shapes_distance
 from converter.simplify import face_info
+from OCCUtils.Common import GpropsFromShape
+from OCCUtils.Construct import compound
 
 BLENDER_FOUNDATION_PATH = Path(r'C:\Program Files\Blender Foundation')
 
@@ -63,7 +64,7 @@ def stl_to_obj(obj_path, blender_path: Union[None, str, Path], *args):
       path = None
     blender_path = find_blender_path(path)
 
-  utils.get_logger().info('blender path: "%s"', blender_path)
+  logger.info('blender path: "{}"', blender_path)
   if blender_path is None or not blender_path.exists():
     raise FileNotFoundError('blender의 경로를 찾을 수 없습니다. '
                             '설치하거나 src\\config.yaml에 경로를 지정해주세요.')
@@ -194,8 +195,7 @@ class ObjConverter:
         if opening_volume:
           # opening의 부피를 추출
           if len(faces) != 6:
-            msg = 'Opening이 직육면체 모양이 아닙니다. 추출에 오류가 발생할 수 있습니다.'
-            utils.get_logger().warning(msg)
+            logger.warning('Opening이 직육면체 모양이 아닙니다. 추출에 오류가 발생할 수 있습니다.')
 
           # 공간과 거리가 떨어져 있는 face (= inlet / outlet) 판단
           dist = [shapes_distance(face, self._space, tol) for face in faces]
@@ -415,7 +415,7 @@ def fix_surface_name(obj_path):
     with open(obj_path) as f:
       geom = f.readlines()
   except FileNotFoundError:
-    utils.get_logger().error('Obj 표면 이름 변환 오류')
+    logger.error('Obj 표면 이름 변환 오류')
     return
 
   p = re.compile(r'((\w+_[a-z0-9]+)_){2}None',

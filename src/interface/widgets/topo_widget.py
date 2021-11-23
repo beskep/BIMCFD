@@ -303,10 +303,11 @@ class TopoRenderer(BaseRenderer):
 
 
 if __name__ == "__main__":
+  from OCC.Core.BRepPrimAPI import BRepPrimAPI_MakeBox, BRepPrimAPI_MakeCone
+
   from kivymd.app import MDApp
   from kivymd.uix.boxlayout import MDBoxLayout
   from kivymd.uix.label import MDLabel
-  from OCC.Core.BRepPrimAPI import BRepPrimAPI_MakeBox, BRepPrimAPI_MakeCone
 
   box = BRepPrimAPI_MakeBox(2.0, 1.0, 1.0).Shape()
   cone = BRepPrimAPI_MakeCone(1.2, 0.8, 0.5).Shape()

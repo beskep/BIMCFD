@@ -12,11 +12,12 @@ from OCC.Core import BRep
 from OCC.Core.BRep import BRep_Tool, BRep_Tool_Surface
 from OCC.Core.BRepMesh import BRepMesh_IncrementalMesh
 from OCC.Extend import DataExchange, TopologyUtils
+from scipy import stats
+from tqdm import tqdm
+
 from OCCUtils import Construct
 from OCCUtils.Common import GpropsFromShape
 from OCCUtils.face import Face
-from scipy import stats
-from tqdm import tqdm
 
 from .simplify import fix_shape, fuse_compound, maker_volume, shapes_distance
 from .visualize import Vis

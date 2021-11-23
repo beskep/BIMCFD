@@ -5,6 +5,7 @@ import utils
 
 from kivy.clock import mainthread
 from kivy.metrics import dp
+from loguru import logger
 
 from converter import ifc_converter as ifccnv
 from converter import openfoam
@@ -87,7 +88,7 @@ class BimCfdApp(BimCfdAppBase):
       self._converter = ifccnv.IfcConverter(path=path.as_posix())
     except Exception:
       self.show_snackbar('IFC 로드 실패')
-      self._logger.error('IFC 로드 실패', exc_info=True)
+      logger.exception('IFC 로드 실패')
       return
 
     self.update_ifc_spaces()
@@ -120,7 +121,7 @@ class BimCfdApp(BimCfdAppBase):
 
       self._spaces = spaces
     else:
-      self._logger.error('IFC가 업데이트 되지 않음.')
+      logger.error('IFC가 업데이트 되지 않음.')
 
   def selected_space_entity(self):
     if self.spaces_menu.selected_item is None:
@@ -130,7 +131,7 @@ class BimCfdApp(BimCfdAppBase):
       selected_text = self.spaces_menu.selected_item_text()
       index = IfcEntityText.index(selected_text)
       space_entity = self._spaces[index - 1]
-      self._logger.debug('Selected space entity: %s', space_entity)
+      logger.debug('Selected space entity: {}', space_entity)
 
     return space_entity
 
@@ -179,8 +180,7 @@ class BimCfdApp(BimCfdAppBase):
     if options['flag_simplify']:
       options['angle_threshold'] *= (3.141592 / 180)  # degree to rad
     else:
-      msg = '형상 단순화를 시행하지 않습니다. 전처리에 오랜 시간이 소요될 수 있습니다.'
-      self._logger.warning(msg)
+      logger.warning('형상 단순화를 시행하지 않습니다. 전처리에 오랜 시간이 소요될 수 있습니다.')
       options['dist_threshold'] = 0.001  # 작은 기준으로 전처리
       options['vol_threshold'] = 0.0
       options['angle_threshold'] = 0.0

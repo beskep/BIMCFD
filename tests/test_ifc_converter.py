@@ -9,16 +9,9 @@ import pytest
 from converter import ifc_converter, openfoam
 from converter.openfoam import OpenFoamCase
 
-ifc_path = r'D:\repo\IFC\DURAARK Datasets\Academic_Autodesk\Academic_Autodesk-AdvancedSampleProject_Arch.ifc'
+ifc_path = r'test\data\Academic_Autodesk-AdvancedSampleProject_Arch.ifc'
 converter = ifc_converter.IfcConverter(ifc_path)
 result_dir = r'D:\CFD\test'
-
-# @pytest.fixture
-# def fixture_converter():
-#   ifc_path = r'D:\repo\IFC\DURAARK Datasets\Academic_Autodesk\Academic_Autodesk-AdvancedSampleProject_Arch.ifc'
-#   assert os.path.exists(ifc_path)
-
-#   return ifc_converter.IfcConverter(ifc_path)
 
 
 def test_openfoam_temperature():
@@ -300,8 +293,3 @@ def test_openfoam_case_from_template():
   name = 'test_case'
 
   OpenFoamCase.from_template(solver=solver, save_dir=save_dir, name=name)
-
-
-if __name__ == '__main__':
-  test_openfoam_case_from_template()
-  # pytest.main(['-v', '-s', '-k', 'test_single_openfoam_case'])

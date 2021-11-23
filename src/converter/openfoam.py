@@ -6,6 +6,8 @@ from typing import List, Tuple
 
 import utils
 
+from loguru import logger
+
 from butterfly.case import Case as ButterflyCase
 from butterfly.decomposeParDict import DecomposeParDict
 from butterfly.foamfile import FoamFile
@@ -137,8 +139,6 @@ class BoundaryFieldDict(OrderedDict):
 
 
 class OpenFoamCase(ButterflyCase):
-  logger = utils.get_logger()
-
   SUBFOLDERS = ('0', 'constant', 'constant\\polyMesh', 'system')
 
   # minimum list of files to be able to run blockMesh and snappyHexMesh
@@ -246,10 +246,10 @@ class OpenFoamCase(ButterflyCase):
         if foam_file:
           ff.append(foam_file)
 
-        cls.logger.debug('Imported %s from case', Path(p))
+        logger.debug('Imported {} from case', Path(p))
 
       except Exception as e:
-        cls.logger.error('Failed to import %s:\n\t%s', Path(p), e)
+        logger.error('Failed to import {}: {}', Path(p), e)
         raise e
 
     bf_geometries = []
@@ -309,7 +309,7 @@ class OpenFoamCase(ButterflyCase):
           msg = 'Failed to create foam file {}\n\t{}'.format(p, e)
 
           if str(e).startswith('[Error 183]'):
-            self.logger.warning(msg)
+            logger.warning(msg)
           else:
             raise IOError(msg) from e
 
@@ -342,8 +342,8 @@ class OpenFoamCase(ButterflyCase):
       else:
         f.save(proj_dir)
 
-    self.logger.info('Project %s is saved to %s', self.project_name,
-                     self.project_dir)
+    logger.info('Project {} is saved to {}', self.project_name,
+                self.project_dir)
 
   def save_shell(self, solver: str, num_of_subdomains: int = None):
     proj_dir = self.project_dir

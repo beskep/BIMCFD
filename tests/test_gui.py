@@ -8,14 +8,13 @@ assert _SRC_DIR.exists()
 sys.path.append(str(_SRC_DIR))
 
 from converter.ifc_converter import IfcConverter
-from interface import topo_widget as wg
+from interface.widgets import topo_widget as wg
 
 
 @pytest.mark.skip
 def test_space_visualization():
-  ifc_path = Path(
-      r'D:\repo\IFC\DURAARK Datasets\Academic_Autodesk\Academic_Autodesk-AdvancedSampleProject_Arch.ifc'
-  )
+  ifc_path = Path(__file__).parent.joinpath(
+      'data/Academic_Autodesk-AdvancedSampleProject_Arch.ifc')
   cnv = IfcConverter(ifc_path)
 
   space = cnv.ifc.by_id(3744)
@@ -35,7 +34,3 @@ def test_space_visualization():
       return wg.TopoRenderer(shapes=[space_mesh, opening_mesh])
 
   RendererApp().run()
-
-
-if __name__ == "__main__":
-  pytest.main(['-v', '-s', '-k', 'test_gui'])
