@@ -7,101 +7,70 @@
             padding: dp(10)
 
             PanelTitle:
-                # icon: 'vector-union'
-                icon: 'tune'
-                text: '형상 단순화'
+                icon: 'widgets-outline'
+                text: 'CFD 모델 최적화 설정'
             MDSeparator:
                 height: dp(1)
                 size_hint_y: None
 
-            # main options
             MDBoxLayout:
-                pading: dp(10)
-                spacing: dp(10)
+                orientation: 'vertical'
+                spacing: dp(5)
 
                 MDBoxLayout:
-                    spacing: dp(10)
-                    # size_hint_x: None
+                    orientation: 'horizontal'
 
-                    MDBoxLayout:
-                        orientation: 'vertical'
+                    MDLabel:
+                        text: '건물 형상 최적화 적용'
+
+                    MDCheckbox:
                         size_hint_x: None
-                        width: dp(25)
-
-                        MDCheckbox:
-                            id: flag_simplify
-                            active: True  # app.on_start()에서 변경
-                            on_state: app.check_simplify(self.state)
-                        MDCheckbox:
-                            id: flag_relative_threshold
-                            active: True
-                            on_state: app.check_relative_threshold(self.state)
-                        MDCheckbox:
-                            id: flag_preserve_openings
-                            active: True
-                        MDCheckbox:
-                            id: flag_opening_volume
-                            active: True
-                        MDCheckbox:
-                            id: flag_internal_faces
-                        MDCheckbox:
-                            id: flag_external_zone
-
-                    MDBoxLayout:
-                        orientation: 'vertical'
-                        size_hint_x: 0.8
-
-                        MDLabel:
-                            text: '형상 단순화 시행'
-                        MDLabel:
-                            text: '상대적 기준 적용'
-                        MDLabel:
-                            text: '개구부 형상 보존'
-                        MDLabel:
-                            text: '개구부 부피 보존'
-                        MDLabel:
-                            text: '내부 표면 추출'
-                        MDLabel:
-                            text: '외부 영역 추출'
+                        active: False
 
                 MDBoxLayout:
-                    orientation: 'vertical'
-                    size_hint_x: 1.2
+                    orientation: 'horizontal'
 
-                    TextFieldUnit:
-                        id: precision
-                        hint_text: '정밀도'
-                        text: '0.1'
-                        unit: 'm'
-                        show_unit: True
-                    TextFieldUnit:
-                        id: dist_threshold
-                        hint_text: '단순화 거리 기준'
-                        text: '0.5'
-                        unit: 'm'
-                        show_unit: False
-                    TextFieldUnit:
-                        id: vol_threshold
-                        hint_text: '단순화 부피 기준'
-                        text: '0.0'
-                        unit: 'm³'
-                        show_unit: False
-                    TextFieldUnit:
-                        id: angle_threshold
-                        hint_text: '단순화 각도 기준'
-                        text: '90.0'
-                        unit: 'degree'
-                        show_unit: True
+                    MDLabel:
+                        text: '건물 형상 최적화 옵션'
 
-                    AnchorLayout:
-                        anchor_x: 'right'
-                        size_hint_y: 0.5
-                        MDRaisedButton:
-                            id: simplify
-                            text: '형상 전처리'
-                            disabled: True
-                            on_release: app.simplify_space()
+                    MDRaisedButton:
+                        id: _button
+                        text: '설정'
+                        on_release: app.open_simplification_dialog()
 
-                MDBoxLayout:
-                    size_hint_x: None
-                    width: dp(10)
+<SimplificationContent@MDBoxLayout>
+    orientation: 'vertical'
+    size_hint_y: None
+    spacing: dp(20)
+
+    MDBoxLayout:
+        MDLabel:
+            text: '상대적 거리 기준 적용'
+
+        MDCheckbox:
+            # active: True
+            size_hint_x: None
+
+    MDBoxLayout:
+        MDLabel:
+            text: '상대적 거리 입력 (단순화 정도)'
+
+        TextFieldFont:
+            text: '0.1 m'
+            size_hint_x: None
+
+    MDBoxLayout:
+        MDLabel:
+            text: '개구부 (창/문) 형상 유지 (단순화 제외)'
+
+        MDCheckbox:
+            active: True
+            size_hint_x: None
+
+    MDBoxLayout:
+        MDLabel:
+            text: '개구부 (창/문) 부피 유지'
+
+        MDCheckbox:
+            active: True
+            size_hint_x: None

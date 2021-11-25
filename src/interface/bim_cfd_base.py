@@ -13,7 +13,9 @@ from kivymd.uix.bottomnavigation import MDBottomNavigation
 from kivymd.uix.boxlayout import MDBoxLayout
 from kivymd.uix.button import MDRaisedButton
 from kivymd.uix.datatables import MDDataTable
+from kivymd.uix.dialog import MDDialog
 from kivymd.uix.filemanager import MDFileManager
+from kivymd.uix.list import ThreeLineIconListItem
 from kivymd.uix.snackbar import Snackbar
 from kivymd.uix.spinner import MDSpinner
 
@@ -24,6 +26,19 @@ from .widgets.text_field import TextFieldPath, TextFieldUnit
 
 _FONT_STYLES = ('H1', 'H2', 'H3', 'H4', 'H5', 'H6', 'Subtitle1', 'Subtitle2',
                 'Body1', 'Body2', 'Button', 'Caption', 'Overline')
+
+_MATERIALS = (
+    ('Brick (Fired Clay)', 0.675, 790),
+    ('Concrete Block', 0.5624888, 626.8238),
+    ('Gypsum Board', 0.16, 1090),
+    ('Plaster Board', 0.58, 1090),
+    ('Plywood', 0.12, 1210),
+    ('Mineral Fiber Insulation', 0.05, 960),
+    ('Asbestos-cement Board', 0.58, 1000),
+    ('Hardboard (High Density)', 0.82, 1340),
+    ('Heavyweight Concrete', 1.95, 900),
+    ('Lightweight Concrete', 0.53, 840),
+)
 
 
 def with_spinner(fn):
@@ -55,6 +70,22 @@ class BimCfdWidget(MDBoxLayout):
   pass
 
 
+class SimplificationContent(MDBoxLayout):
+  pass
+
+
+class MaterialListItem(ThreeLineIconListItem):
+  divider = None
+
+
+def _material_list_item(values):
+  return MaterialListItem(
+      text=values[0],
+      secondary_text=f'Conductivity: {values[1]:.3e} W/mK',
+      tertiary_text=f'Specific heat: {values[2]:.3e} J/kgK',
+  )
+
+
 class BimCfdAppBase(MDApp):
 
   def __init__(self, **kwargs):
@@ -65,12 +96,13 @@ class BimCfdAppBase(MDApp):
 
     # GUI setting
     self.theme_cls.theme_style = 'Light'
-    self.theme_cls.primary_palette = 'Green'
+    self.theme_cls.primary_palette = 'Gray'
+    self.theme_cls.primary_hue = '600'
 
     for fs in _FONT_STYLES:
       self.theme_cls.font_styles[fs][0] = 'NotoSansKR'
 
-    self.title = 'BIM-CFD Pre-processing App ver 1.0'
+    self.title = 'CFD Environment Variables'
 
     self.file_manager = MDFileManager()
     self.file_manager.exit_manager = self.exit_file_manager
@@ -90,6 +122,8 @@ class BimCfdAppBase(MDApp):
 
     self._cfd_dialog = None
     self._cfd_options = None
+    self._simpl_dialog = None
+    self._material_dialog = None
 
   def build(self):
     return BimCfdWidget()
@@ -114,9 +148,6 @@ class BimCfdAppBase(MDApp):
 
   def on_start(self):
     super().on_start()
-
-    # simplification option
-    self.root.ids.simplification_panel.ids.flag_simplify.active = False
 
     # snackbar
     gap = dp(10)
@@ -157,10 +188,6 @@ class BimCfdAppBase(MDApp):
       self._space_menu.menu.on_release = callback
 
     return self._space_menu
-
-  @property
-  def solver_menu(self) -> DropDownMenu:
-    return self.root.ids.cfd_panel.ids.solver
 
   @property
   def spinner(self) -> MDSpinner:
@@ -422,3 +449,33 @@ class BimCfdAppBase(MDApp):
     data_table.pos_hint = {'center_x': 0.5, 'center_y': 0.5}
 
     self.material_table_layout.add_widget(data_table)
+
+  def open_simplification_dialog(self):
+    if self._simpl_dialog is None:
+      ok_btn = MDRaisedButton(text='확인')
+      self._simpl_dialog = MDDialog(title='건물 형상 최적화 설정',
+                                    type='custom',
+                                    content_cls=SimplificationContent(),
+                                    buttons=[ok_btn])
+      ok_btn.on_release = self._simpl_dialog.dismiss
+      self._simpl_dialog.width = 450
+
+    self._simpl_dialog.open()
+
+  def open_material_dialog(self):
+    if self._material_dialog is None:
+      buttons = [
+          MDRaisedButton(text='추가'),
+          MDRaisedButton(text='삭제'),
+          MDRaisedButton(text='확인')
+      ]
+
+      self._material_dialog = MDDialog(
+          title='물성정보 데이터베이스',
+          type='simple',
+          items=[_material_list_item(x) for x in _MATERIALS],
+          buttons=buttons)
+      buttons[2].on_release = self._material_dialog.dismiss
+      self._material_dialog.height = 500
+
+    self._material_dialog.open()

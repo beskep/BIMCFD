@@ -73,7 +73,7 @@ class BimCfdApp(BimCfdAppBase):
   def on_start(self):
     super().on_start()
 
-    self.solver_menu.set_items(text=openfoam.supported_solvers())
+    # self.solver_menu.set_items(text=openfoam.supported_solvers())
 
   def select_path(self, path):
     super().select_path(path)
@@ -325,17 +325,6 @@ class BimCfdApp(BimCfdAppBase):
 
     self._execute_helper(simplified=self._simplified, save_dir=save_dir)
 
-  def test_add_tables(self):
-    self.add_geom_table(
-        column_data=[('변수', dp(30)), ('전처리 전', dp(30)), ('전처리 후', dp(30))],
-        row_data=[('부피', 1, 2), ('표면적', 3, 4), ('특성길이', 5, 6)],
-    )
-    self.add_material_table(
-        column_data=[('재료명', dp(30)), ('두께', dp(30)), ('열전도율', dp(30)),
-                     ('매칭 결과', dp(30))],
-        row_data=[('a', 'b', 'c'), (1, 2, 3), (4, 5, 6), ('A', 'B', 'C')],
-    )
-
 
 def main():
   font_regular = utils.DIR.RESOURCE.joinpath('NotoSansCJKkr-Medium.otf')
@@ -351,8 +340,9 @@ def main():
   kvs = [
       'bim_cfd',
       'file_panel',
+      'material_panel',
+      'output_panel',
       'simplification_panel',
-      'cfd_panel',
       'view_panel',
   ]
   for kv in kvs:
@@ -361,13 +351,6 @@ def main():
 
   app = BimCfdApp()
   app.manual_build()
-
-  # test
-  # app.file_manager.mode = 'bim'
-  # app.exit_file_manager = lambda: print()
-  # app.select_path((r'D:\repo\IFC\National Institute of Building Sciences'
-  #                  r'\Project 3. Medical Clinic\2011-09-14-Clinic-IFC'
-  #                  r'\Clinic_A_20110906_optimized.ifc'))
 
   app.run()
 

@@ -1,0 +1,29 @@
+#:kivy 1.11
+
+<MaterialPanel@MDBoxLayout>:
+    BIMCFDPanel:
+        MDGridLayout:
+            cols: 1
+            padding: dp(10)
+
+            PanelTitle:
+                icon: 'home-analytics'
+                text: '물성정보 데이터베이스'
+            MDSeparator:
+                height: dp(1)
+                size_hint_y: None
+
+            MDBoxLayout:
+                orientation: 'horizontal'
+                spacing: dp(5)
+
+                MDLabel:
+                    text: '건축재료 물성정보'
+
+                MDRaisedButton:
+                    text: '설정'
+                    on_release: app.open_material_dialog()
+
+<MaterialListItem>
+    # IconLeftWidget:
+    #     icon: 'wall'

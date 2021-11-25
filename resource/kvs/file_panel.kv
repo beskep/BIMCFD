@@ -7,7 +7,7 @@
             padding: dp(10)
 
             PanelTitle:
-                icon: 'folder-outline'
+                icon: 'home-city'
                 text: 'BIM 모델'
             MDSeparator:
                 height: dp(1)
@@ -24,43 +24,20 @@
 
                     TextFieldPath:
                         id: bim_path
-                        hint_text: 'BIM 파일 경로'
+                        hint_text: 'BIM 모델 불러오기'
                         helper_text_mode: 'on_error'
                         # on_text: app.check_bim_path_exist(self.text)
+
                     MDRaisedButton:
-                    # MDRectangleFlatIconButton:
                         text: '파일 선택'
-                        # icon: 'home-import-outline'
                         on_release: app.open_file_manager('bim')
 
-                MDBoxLayout:
-                    orientation: 'horizontal'
-                    spacing: dp(5)
-
-                    TextFieldPath:
-                        id: save_dir
-                        hint_text: '저장 경로'
-                    MDRaisedButton:
-                    # MDRectangleFlatIconButton:
-                        text: '폴더 선택'
-                        # icon: 'content-save-edit'
-                        on_release: app.open_file_manager('save')
+                MDLabel:
+                    text: '환경변수 설정 공간 선택'
 
                 MDBoxLayout:
                     orientation: 'horizontal'
                     spacing: dp(5)
-
-                    MDLabel:
-                        text: '대상 공간'
-                        size_hint_x: None
-                        width: dp(80)
                     DropDownMenu:
                         id: space
                         text: '[color=#A9A9A9]선택[/color]'
-                        # text_width: 20
-                        # size_hint_x: 1
-                    MDRaisedButton:
-                        id: visualize
-                        text: '시각화'
-                        disabled: True
-                        on_release: app.visualize_selected_space()

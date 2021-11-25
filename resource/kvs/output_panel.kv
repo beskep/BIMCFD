@@ -1,0 +1,32 @@
+#:kivy 1.11
+
+<OutputPanel@MDBoxLayout>:
+    BIMCFDPanel:
+        MDGridLayout:
+            cols: 1
+            padding: dp(10)
+
+            PanelTitle:
+                icon: 'printer'
+                text: '결과 출력'
+            MDSeparator:
+                height: dp(1)
+                size_hint_y: None
+
+            MDBoxLayout:
+                orientation: 'vertical'
+                # spacing: dp(10)
+                # padding: dp(10)
+
+                MDBoxLayout:
+                    orientation: 'horizontal'
+
+                    MDLabel:
+                        text: '파일 저장 경로'
+
+                    MDRaisedButton:
+                        text: '선택'
+
+                TextFieldPath:
+                    hint_text: '저장 경로를 설정해주세요'
+                    helper_text_mode: 'on_error'

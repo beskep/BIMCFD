@@ -2,7 +2,7 @@
 
 <MDRaisedButton>:
     pos_hint: {'center_y': 0.5}
-    text_color: 0, 0, 0, 0.9
+    # text_color: 0, 0, 0, 0.9
 <MDLabel>:
     pos_hint: {'center_y': 0.5}
 <MDTextField>:
@@ -20,25 +20,57 @@
     elevation: 1
 
 <BimCfdWidget>:
-    # MDBoxLayout:
-    orientation: 'horizontal'
+    orientation: 'vertical'
     padding: dp(10)
     spacing: dp(10)
 
     MDBoxLayout:
-        orientation: 'vertical'
+        orientation: 'horizontal'
         spacing: dp(10)
+        elevation: 0
 
-        FilePanel:
-            id: file_panel
-            size_hint_y: 1.5
-        SimplificationPanel:
-            id: simplification_panel
-            size_hint_y: 2.5
-        CFDPanel:
-            id: cfd_panel
-            size_hint_y: 1
+        MDBoxLayout:
+            orientation: 'vertical'
+            spacing: dp(10)
+            elevation: 0
+            size_hint_x: 0.4
 
-    ViewPanel:
-        id: view_panel
-        size_hint_x: 1.5
+            FilePanel:
+                id: file_panel
+                size_hint_y: 1.2
+
+            SimplificationPanel:
+                id: simplification_panel
+
+            MaterialPanel:
+                id: material_panel
+                size_hint_y: 0.6
+
+            OutputPanel:
+                id: output_panel
+
+            MDStackLayout:
+                orientation: 'rl-tb'
+                adaptive_height: True
+
+                MDRaisedButton:
+                    # pos_hint: {'center_x': .5, 'center_y': .5}
+                    text: 'CFD 환경변수 변환 및 출력'
+                    font_size: 16
+
+        ViewPanel:
+            id: view_panel
+            elevation: 0
+
+    MDScreen:
+        height: 35
+        size_hint_y: None
+        radius: [5, 5, 5, 5]
+        md_bg_color: (0.741, 0.741, 0.741, 1)
+
+        MDBoxLayout:
+            padding: dp(5)
+
+            MDLabel:
+                text: 'Status message'
+                text_color: (1, 1, 1, 0.9)
