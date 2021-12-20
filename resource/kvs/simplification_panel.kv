@@ -24,6 +24,7 @@
                         text: '건물 형상 최적화 적용'
 
                     MDCheckbox:
+                        id: flag_simplify
                         size_hint_x: None
                         active: False
 
@@ -48,22 +49,27 @@
             text: '상대적 거리 기준 적용'
 
         MDCheckbox:
+            id: flag_relative_threshold
             # active: True
             size_hint_x: None
 
     MDBoxLayout:
         MDLabel:
-            text: '상대적 거리 입력 (단순화 정도)'
+            text: '단순화 거리 기준'
 
-        TextFieldFont:
-            text: '0.1 m'
+        TextFieldUnit:
+            id: dist_threshold
+            text: '0.1'
+            unit: 'm'
             size_hint_x: None
+            show_unit: not flag_relative_threshold.active
 
     MDBoxLayout:
         MDLabel:
             text: '개구부 (창/문) 형상 유지 (단순화 제외)'
 
         MDCheckbox:
+            id: flag_preserve_openings
             active: True
             size_hint_x: None
 
@@ -72,5 +78,6 @@
             text: '개구부 (창/문) 부피 유지'
 
         MDCheckbox:
+            id: flag_opening_volume
             active: True
             size_hint_x: None

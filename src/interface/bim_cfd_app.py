@@ -12,6 +12,7 @@ from converter import openfoam
 from interface import kvtools
 from interface.bim_cfd_base import BimCfdAppBase, with_spinner
 from interface.widgets import topo_widget as topo
+from interface.widgets.drop_down import DropDownMenu
 
 
 def _itc(geom_info: dict):
@@ -67,6 +68,7 @@ class BimCfdApp(BimCfdAppBase):
     self._spaces: list = None
     self._target_space_id = None
     self._simplified: dict = None
+    self._renderer: topo.TopoRenderer = None
 
     # todo: 그래픽 관련 method 모두 mainthread로
 
@@ -94,6 +96,9 @@ class BimCfdApp(BimCfdAppBase):
     self.update_ifc_spaces()
 
     options = self.get_simplification_options()
+    for key, value in options.items():
+      logger.debug('{}: {}', key, value)
+
     if options is not None:
       self._converter.brep_deflection = options['precision']
 
@@ -122,6 +127,19 @@ class BimCfdApp(BimCfdAppBase):
       self._spaces = spaces
     else:
       logger.error('IFC가 업데이트 되지 않음.')
+
+  @property
+  def spaces_menu(self) -> DropDownMenu:
+    if self._space_menu is None:
+      self._space_menu = self.root.ids.file_panel.ids.space
+
+      def callback(*args, **kwargs):
+        self._space_menu.select_item(*args, **kwargs)
+        self.visualize_selected_space()
+
+      self._space_menu.menu.on_release = callback
+
+    return self._space_menu
 
   def selected_space_entity(self):
     if self.spaces_menu.selected_item is None:
@@ -152,12 +170,12 @@ class BimCfdApp(BimCfdAppBase):
           color=(0.216, 0.494, 0.722, 0.5))
       meshes.append(openings_mesh)
 
-    topo_renderer = topo.TopoRenderer(shapes=meshes,
-                                      default_scale=0.8,
-                                      near=0.01,
-                                      perspective=0.01)
+    self._renderer = topo.TopoRenderer(shapes=meshes,
+                                       default_scale=0.8,
+                                       near=0.01,
+                                       perspective=0.01)
     self.vis_layout.clear_widgets()
-    self.vis_layout.add_widget(topo_renderer)
+    self.vis_layout.add_widget(self._renderer)
 
   def visualize_selected_space(self):
     space_entity = self.selected_space_entity()
@@ -209,7 +227,7 @@ class BimCfdApp(BimCfdAppBase):
     self._set_grid_resolution(grid_resolution)
 
     self.show_simplification_results()
-    self.execute_button.disabled = False
+    # self.execute_button.disabled = False
     self.show_snackbar('형상 전처리 완료', duration=1.0)
 
   def show_geom_info(self, simplified):
@@ -242,7 +260,6 @@ class BimCfdApp(BimCfdAppBase):
   def show_material_info(self, simplified):
     walls = simplified['walls']
     _, match_dict = self._converter.match_thermal_propes(walls=walls)
-
     materials = sorted(list(match_dict.keys()))
 
     cols = [
@@ -299,11 +316,12 @@ class BimCfdApp(BimCfdAppBase):
 
     self._converter.save_simplified_space(simplified=simplified,
                                           path=geom_dir.as_posix())
-
     self._converter.openfoam_case(simplified=simplified,
                                   save_dir=save_dir,
                                   case_name='BIMCFD',
                                   openfoam_options=openfoam_options)
+
+    self.show_snackbar('저장 완료')
 
   def execute(self):
     if not self.save_dir_field.text:

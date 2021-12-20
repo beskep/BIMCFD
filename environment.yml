@@ -14,13 +14,14 @@ dependencies:
     - scipy
     - pandas
     - fuzzywuzzy
-    - kivy=1.11
-    - kivymd
+    - kivy
+    # - kivymd # ver 0.104.2.dev0
     - rich
     - loguru
     - pyyaml
+    - pyinstaller
     - tqdm
-    - toml
     - pytest
     - pylint
     - yapf
+    - toml

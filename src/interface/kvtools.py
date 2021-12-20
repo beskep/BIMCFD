@@ -14,6 +14,15 @@ def config():
              value='mouse,multitouch_on_demand')
 
 
+def activate_inspector():
+  from kivy.config import Config
+  from kivy.modules import Modules
+  from kivy.core.window import Window
+
+  Config.set('modules', 'inspector', '')
+  Modules.activate_module('inspector', Window)
+
+
 def load_kv(path, encoding='UTF-8'):
   if not os.path.exists(path):
     raise FileNotFoundError(path)

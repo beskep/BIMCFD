@@ -26,7 +26,9 @@
 
                     MDRaisedButton:
                         text: '선택'
+                        on_release: app.open_file_manager('save')
 
                 TextFieldPath:
+                    id: save_dir
                     hint_text: '저장 경로를 설정해주세요'
                     helper_text_mode: 'on_error'

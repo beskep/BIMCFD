@@ -52,11 +52,17 @@
             MDStackLayout:
                 orientation: 'rl-tb'
                 adaptive_height: True
+                spacing: dp(5)
 
                 MDRaisedButton:
-                    # pos_hint: {'center_x': .5, 'center_y': .5}
-                    text: 'CFD 환경변수 변환 및 출력'
+                    text: 'CFD 환경변수 변환'
                     font_size: 16
+                    on_release: app.execute()
+
+                MDRaisedButton:
+                    text: '전처리'
+                    font_size: 16
+                    on_release: app.simplify_space()
 
         ViewPanel:
             id: view_panel
@@ -72,5 +78,6 @@
             padding: dp(5)
 
             MDLabel:
-                text: 'Status message'
+                id: status_bar
+                text: 'CFD Environment Variables'
                 text_color: (1, 1, 1, 0.9)

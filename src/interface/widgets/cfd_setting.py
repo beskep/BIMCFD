@@ -124,7 +124,7 @@ class CfdSettingContent(MDBoxLayout):
     SpacingBox:
       TextFieldUnit:
         hint_text: 'No. of subdomains'
-        text: '6'  # fixme: TTA
+        text: ''
         id: text_num_of_subdomains
       MDBoxLayout:
   '''

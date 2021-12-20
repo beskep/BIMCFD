@@ -3,6 +3,8 @@ import os
 import sys
 from pathlib import Path
 
+from kivy.tools.packaging.pyinstaller_hooks import (get_deps_minimal, hookspath,
+                                                    runtime_hooks)
 from PyInstaller import compat
 
 sys.setrecursionlimit(5000)
@@ -13,23 +15,28 @@ if SRC_DIR not in sys.path:
 
 from kivymd import hooks_path
 
-mkldir = Path(compat.base_prefix).joinpath('Library/bin')
-mklbins = [(x.as_posix(), '.') for x in mkldir.glob('mkl*.dll')]
-
 block_cipher = None
+
+deps = get_deps_minimal(audio=False, camera=False, spelling=False)
+deps['hiddenimports'].append('kivymd.stiffscroll')
+
+mkldir = Path(compat.base_prefix).joinpath('Library/bin')
+deps['binaries'].extend([(x.as_posix(), '.') for x in mkldir.glob('mkl*.dll')])
+
+libpng = list(
+    Path(compat.base_prefix).joinpath('share/sdl2/bin').glob('libpng*'))[0]
+deps['binaries'].append((libpng.as_posix(), '.'))
 
 a = Analysis(['BIMCFD.py'],
              pathex=['D:\\Python\\BIMCFD'],
-             binaries=mklbins,
              datas=[('resource\\', 'resource\\')],
-             hiddenimports=['kivymd.stiffscroll'],
              hookspath=[hooks_path, SRC_DIR],
-             runtime_hooks=[],
-             excludes=[],
+             runtime_hooks=runtime_hooks(),
              win_no_prefer_redirects=False,
              win_private_assemblies=False,
              cipher=block_cipher,
-             noarchive=False)
+             noarchive=False,
+             **deps)
 pyz = PYZ(a.pure, a.zipped_data, cipher=block_cipher)
 exe = EXE(pyz,
           a.scripts, [],

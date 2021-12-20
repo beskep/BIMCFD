@@ -801,6 +801,8 @@ class IfcConverter:
       wall_names = [wall_names[x] for x in indices]
       wall_shapes = [wall_shapes[x] for x in indices]
 
+    opening_names = (['Opening_{}'.format(x) for x in range(len(openings))]
+                     if openings else [])
     results = {
         'original': shape,
         'simplified': simplified,
@@ -810,7 +812,7 @@ class IfcConverter:
         'wall_shapes': wall_shapes,
         'wall_names': wall_names,
         'openings': openings,
-        'opening_names': ['Opening_{}'.format(x) for x in range(len(openings))],
+        'opening_names': opening_names,
         'info': info
     }
 

@@ -15,6 +15,7 @@ from kivymd.uix.button import MDRaisedButton
 from kivymd.uix.datatables import MDDataTable
 from kivymd.uix.dialog import MDDialog
 from kivymd.uix.filemanager import MDFileManager
+from kivymd.uix.label import MDLabel
 from kivymd.uix.list import ThreeLineIconListItem
 from kivymd.uix.snackbar import Snackbar
 from kivymd.uix.spinner import MDSpinner
@@ -161,19 +162,19 @@ class BimCfdAppBase(MDApp):
 
   @property
   def save_dir_field(self) -> TextFieldPath:
-    return self.root.ids.file_panel.ids.save_dir
+    return self.root.ids.output_panel.ids.save_dir
 
-  @property
-  def visualize_button(self) -> MDRaisedButton:
-    return self.root.ids.file_panel.ids.visualize
+  # @property
+  # def visualize_button(self) -> MDRaisedButton:
+  #   return self.root.ids.file_panel.ids.visualize
 
-  @property
-  def simplify_button(self) -> MDRaisedButton:
-    return self.root.ids.simplification_panel.ids.simplify
+  # @property
+  # def simplify_button(self) -> MDRaisedButton:
+  #   return self.root.ids.simplification_panel.ids.simplify
 
-  @property
-  def execute_button(self) -> MDRaisedButton:
-    return self.root.ids.cfd_panel.ids.execute
+  # @property
+  # def execute_button(self) -> MDRaisedButton:
+  #   return self.root.ids.cfd_panel.ids.execute
 
   @property
   def spaces_menu(self) -> DropDownMenu:
@@ -182,8 +183,8 @@ class BimCfdAppBase(MDApp):
 
       def callback(*args, **kwargs):
         self._space_menu.select_item(*args, **kwargs)
-        self.visualize_button.disabled = False
-        self.simplify_button.disabled = False
+        # self.visualize_button.disabled = False
+        # self.simplify_button.disabled = False
 
       self._space_menu.menu.on_release = callback
 
@@ -203,6 +204,10 @@ class BimCfdAppBase(MDApp):
       self._spinner = spinner
 
     return self._spinner
+
+  @property
+  def status_bar(self) -> MDLabel:
+    return self.root.ids.status_bar
 
   @property
   def vis_navigation(self) -> MDBottomNavigation:
@@ -235,8 +240,7 @@ class BimCfdAppBase(MDApp):
     elif mode == 'save':
       cur_dir = self._save_dir
       ext = []
-      # search = 'dirs'
-      search = 'all'  # fixme
+      search = 'dirs'
     else:
       msg = 'file_manager.mode ({}) not in ["bim", "save"]'.format(mode)
       logger.error(msg)
@@ -277,8 +281,8 @@ class BimCfdAppBase(MDApp):
 
     self.exit_file_manager()
 
-  def check_bim_path(self, path: Path):
-    if path.suffix.lower() == '.ifc':
+  def check_bim_path(self, path):
+    if Path(path).suffix.lower() == '.ifc':
       self.bim_path_field.error = False
     else:
       self.bim_path_field.error = True
@@ -321,54 +325,72 @@ class BimCfdAppBase(MDApp):
       field.show_unit = state == 'normal'
 
   def get_simplification_options(self):
-    boolean_options = [
-        'flag_simplify',
-        'flag_relative_threshold',
-        'flag_preserve_openings',
-        'flag_opening_volume',
-        'flag_internal_faces',
-        'flag_external_zone',
-    ]
-    numerical_options = [
-        'precision',
-        'dist_threshold',
-        'vol_threshold',
-        'angle_threshold',
-    ]
-    numerical_option_lables = [
-        '정밀도',
-        '단순화 거리 기준',
-        '단순화 부피 기준',
-        '단순화 각도 기준',
-    ]
+    default_options = (
+        ('flag_simplify', False, '건물 형상 최적화 적용 여부'),
+        ('flag_relative_threshold', False, '상대적 거리 기준 적용'),
+        ('flag_preserve_openings', True, '개구부 형상 유지'),
+        ('flag_opening_volume', True, '개구부 부피 유지'),
+        ('flag_internal_faces', False, '내부 표면 추출'),
+        ('flag_external_zone', False, '외부 영역 추출'),
+        ('precision', 0.1, '정밀도'),
+        ('dist_threshold', 0.5, '단순화 거리 기준'),
+        ('vol_threshold', 0.0, '단순화 부피 기준'),
+        ('angle_threshold', 90.0, '단순화 각도 기준'),
+    )
 
-    option_ids = self.root.ids.simplification_panel.ids
-    res = dict()
+    option_ids: dict = self.root.ids.simplification_panel.ids.copy()
+    if self._simpl_dialog is not None:
+      option_ids.update(self._simpl_dialog.content_cls.ids.copy())
+    options = dict()
 
-    for option in boolean_options:
-      state = option_ids[option].state
-      assert state in ['down', 'normal']
-      res[option] = (state == 'down')
+    for key, default, label in default_options:
+      if key not in option_ids:
+        logger.debug('기본 설정 적용 {}: {}', label, default)
+        value = default
+      elif isinstance(default, bool):
+        state = option_ids[key].state
+        assert state in {'down', 'normal'}
+        value = (state == 'down')
+      else:
+        field: TextFieldUnit = option_ids[key]
 
-    for option, label in zip(numerical_options, numerical_option_lables):
-      field: TextFieldUnit = option_ids[option]
+        try:
+          value = float(field.get_main_text())
+        except ValueError:
+          msg = '[{}] 설정값이 올바르지 않습니다.'.format(label)
+          logger.warning(msg)
+          self.show_snackbar(msg)
+          return None
 
-      try:
-        value = float(field.get_main_text())
-      except ValueError:
-        msg = '[{}] 설정값이 올바르지 않습니다.'.format(label)
-        logger.warning(msg)
-        self.show_snackbar(msg)
-        return None
+      options[key] = value
 
-      res[option] = value
-
-    return res
+    return options
 
   def get_openfoam_options(self):
-    solver = self.solver_menu.selected_item_text()
     simplfication_opt = self.get_simplification_options()
-    dialog_opt = self.cfd_dialog.options
+    try:
+      solver = self.solver_menu.selected_item_text()
+    except AttributeError:
+      solver = 'buoyantSimpleFoam'
+
+    try:
+      dialog_opt = self.cfd_dialog.options
+    except AttributeError:
+      dialog_opt = {
+          'flag_friction': False,
+          'flag_heat_flux': True,
+          'flag_mesh_resolution': True,
+          'flag_mesh_size': False,
+          'text_boundary_cell_size': 0,
+          'text_boundary_layers_count': 0,
+          'text_external_htc': None,
+          'text_external_size': 5,
+          'text_external_temperature': 293.15,
+          'text_mesh_min_size': 0,
+          'text_mesh_resolution': 24,
+          'text_mesh_size': None,
+          'text_num_of_subdomains': None,
+      }
 
     ofopt = {
         'solver': solver,
@@ -391,7 +413,6 @@ class BimCfdAppBase(MDApp):
     keys = {
         'text_mesh_min_size': 'min_cell_size',
         'text_boundary_cell_size': 'boundary_cell_size',
-        'text_external_htc': 'heat_transfer_coefficient',
         'text_num_of_subdomains': 'num_of_subdomains',
     }
     for dkey, okey in keys.items():
@@ -425,6 +446,7 @@ class BimCfdAppBase(MDApp):
       # 이번 요청은 무시
       pass
 
+    self.status_bar.text = message
     logger.info('[Snackbar] {}', message)
 
   @mainthread
@@ -465,8 +487,8 @@ class BimCfdAppBase(MDApp):
   def open_material_dialog(self):
     if self._material_dialog is None:
       buttons = [
-          MDRaisedButton(text='추가'),
-          MDRaisedButton(text='삭제'),
+          # MDRaisedButton(text='추가'),
+          # MDRaisedButton(text='삭제'),
           MDRaisedButton(text='확인')
       ]
 
@@ -475,7 +497,7 @@ class BimCfdAppBase(MDApp):
           type='simple',
           items=[_material_list_item(x) for x in _MATERIALS],
           buttons=buttons)
-      buttons[2].on_release = self._material_dialog.dismiss
+      buttons[-1].on_release = self._material_dialog.dismiss
       self._material_dialog.height = 500
 
     self._material_dialog.open()
