@@ -5,7 +5,7 @@ from collections import defaultdict
 from itertools import chain
 from pathlib import Path
 from tempfile import TemporaryDirectory
-from typing import Collection, Iterable, Union
+from typing import Collection, Iterable, Optional, Union
 
 import utils
 
@@ -33,34 +33,37 @@ BLENDER_SCRIPT_PATH.stat()
 def find_blender_path(path=None):
   path = Path(path) if path else BLENDER_FOUNDATION_PATH
   if not path.exists():
-    res = None
+    blender = None
   else:
     if path.is_file() and path.name == 'blender.exe':
-      res = path
+      blender = path
     else:
       if path.is_file():
         path = path.parent
 
       ls = list(path.rglob('blender.exe'))
       if not ls:
-        res = None
+        blender = None
       else:
-        res = sorted(ls)[-1]
+        blender = sorted(ls)[-1]
 
-  return res
+  if blender is None:
+    raise FileNotFoundError('Blender path not found')
+
+  return blender
 
 
 def stl_to_obj(obj_path, blender_path: Union[None, str, Path], *args):
   obj_path = os.path.abspath(obj_path)
   stl_path = [os.path.abspath(x) for x in args]
 
-  blender_path = find_blender_path(blender_path)
-  logger.info('blender path: "{}"', blender_path)
-  if blender_path is None or not blender_path.exists():
+  blender = find_blender_path(blender_path)
+  logger.info('blender path: "{}"', blender)
+  if blender_path is None or not blender.exists():
     raise FileNotFoundError('blender의 경로를 찾을 수 없습니다.')
 
   run_args = [
-      blender_path.as_posix(),
+      blender.as_posix(),
       EMPTY_BLEND_PATH.as_posix(),
       '--background',
       '--python',
@@ -68,7 +71,7 @@ def stl_to_obj(obj_path, blender_path: Union[None, str, Path], *args):
       obj_path,
   ]
   run_args.extend(stl_path)
-  subprocess.run(run_args, stdout=subprocess.PIPE)
+  subprocess.run(run_args, stdout=subprocess.PIPE, check=False)
 
 
 def get_face_id(shape: TopoDS_Shape, hash_upper=1e8):
@@ -105,9 +108,9 @@ class ObjConverter:
   def __init__(self,
                compound: TopoDS_Compound,
                space: TopoDS_Shape,
-               openings: Union[None, Collection[TopoDS_Shape]] = None,
-               walls: Union[None, Collection[TopoDS_Shape]] = None,
-               wall_names: Union[None, Collection[str]] = None,
+               openings: Optional[Collection[TopoDS_Shape]] = None,
+               walls: Optional[Collection[TopoDS_Shape]] = None,
+               wall_names: Optional[Collection[str]] = None,
                additional_faces: dict = None,
                hash_upper=1e8):
     self._compound = compound
@@ -123,23 +126,16 @@ class ObjConverter:
     self._comp_faces, self._comp_ids = get_face_id(self._compound,
                                                    self._hash_upper)
 
-    if openings:
+    if not openings:
+      self._op_faces = None
+      self._opening_count = 0
+    else:
       self._op_faces = tuple(
           tuple(TopologyExplorer(opening).faces()) for opening in openings)
       self._opening_count = len(openings)
-    else:
-      self._op_faces = None
-      self._opening_count = 0
 
-    if walls:
-      self._walls = tuple(walls)
-    else:
-      self._walls = None
-
-    if wall_names:
-      self._wall_names = tuple(wall_names)
-    else:
-      self._wall_names = None
+    self._walls = tuple(walls) if walls else ()
+    self._wall_names = tuple(wall_names) if wall_names else ()
 
   @property
   def surface(self):
@@ -276,7 +272,7 @@ class ObjConverter:
           ]
 
   def classify_walls(self, tol=1e-4):
-    if self._walls is None:
+    if not self._walls:
       return
 
     # 각 surface에 대해 가장 가까운 wall의 번호 계산
@@ -289,7 +285,7 @@ class ObjConverter:
     ])
     closest = np.argmin(dist, axis=1)
 
-    if self._wall_names is None:
+    if not self._wall_names:
       length = len(str(int(np.max(closest))))
       names = ['{:0{}d}'.format(x, length) for x in closest]
     else:
@@ -317,7 +313,7 @@ class ObjConverter:
     with TemporaryDirectory() as temp_dir:
       path_list = list()
 
-      if self._walls is None:
+      if not self._walls:
         surface_path = os.path.join(temp_dir, 'surface.stl')
         write_stl_file(a_shape=compound(self._obj_surface),
                        filename=surface_path,
@@ -386,8 +382,7 @@ class ObjConverter:
 
   def valid_surfaces(self):
     if (self._obj_surface is not None) and (self._wall_names is not None):
-      names = list(set(x[0] for x in self._obj_surface))
-      names.sort()
+      names = sorted(set(x[0] for x in self._obj_surface))
     else:
       names = None
 
@@ -395,12 +390,7 @@ class ObjConverter:
 
 
 def fix_surface_name(obj_path):
-  """
-  blender에서 저장한 표면 이름 (e.g. Surface_0_Surface_0_None)을 수정
-
-  :param obj_path:
-  :return: None
-  """
+  """blender에서 저장한 표면 이름 (e.g. Surface_0_Surface_0_None)을 수정"""
   try:
     with open(obj_path) as f:
       geom = f.readlines()
@@ -416,7 +406,7 @@ def fix_surface_name(obj_path):
   for idx, line in enumerate(geom):
     new_geom[idx] = p.sub('\\2', line)
 
-  assert all([x is not None for x in new_geom])
+  assert all(x is not None for x in new_geom)
 
   if new_geom != geom:
     with open(obj_path, 'w') as f:
@@ -427,33 +417,51 @@ def fix_surface_name(obj_path):
 
 def write_obj(compound: TopoDS_Compound,
               space: TopoDS_Shape,
-              openings: Union[None, Iterable[TopoDS_Shape]],
-              walls: Union[None, Iterable[TopoDS_Shape]],
+              openings: Optional[Collection[TopoDS_Shape]],
+              walls: Optional[Collection[TopoDS_Shape]],
               obj_path: str,
-              deflection,
-              wall_names=None,
+              deflection: float,
+              wall_names: Optional[list]=None,
               additional_faces: dict = None,
-              blender_path=None,
+              blender_path: Optional[Union[str, Path]] = None,
               extract_interior=True,
               extract_opening_volume=False,
               hash_upper=1e8,
-              tol=1e-4):
+              tol=1e-4) -> Optional[list]:
   """
+  Parameters
+  ----------
+  compound : TopoDS_Compound
+      단순화를 마친 compound
+  space : TopoDS_Shape
+      opening을 포함하지 않은 공간의 shape
+  openings : Optional[Collection[TopoDS_Shape]]
+      대상 공간과 함께 추출하는 opening의 목록
+  walls : Optional[Collection[TopoDS_Shape]]
+      벽 목록 (슬라브 포함)
+  obj_path : str
+      obj 파일 저장 경로
+  deflection : float
+      deflection
+  wall_names : Optional[list], optional
+      추출할 벽 표면의 이름 리스트, by default None
+  additional_faces : dict, optional
+      추가로 추출할 face dict {name: TopoDS_Face}, by default None
+  blender_path : Optional[Union[str, Path]], optional
+      blender가 설치된 경로, by default None
+  extract_interior : bool, optional
+      내부 경계 면을 추출할지 여부, by default True
+  extract_opening_volume : bool, optional
+      opening을 부피 혹은 면으로 추출하는 옵션, by default False
+  hash_upper : int, optional
+      face 구분에 사용되는 hash의 최댓값, by default 1e8
+  tol : float, optional
+      opening face 구분에 사용되는 거리 허용 오차, by default 1e-4
 
-  :param compound: 단순화를 마친 compound
-  :param space: opening을 포함하지 않은 공간의 shape
-  :param openings: 대상 공간과 함께 추출하는 opening의 목록
-  :param walls: 벽 목록 (슬라브 포함)
-  :param obj_path: obj 파일 저장 경로
-  :param deflection: deflection
-  :param wall_names: 추출할 벽 표면의 이름 리스트
-  :param additional_faces: 추가로 추출할 face dict {name: TopoDS_Face}
-  :param blender_path: blender가 설치된 경로
-  :param extract_interior: 내부 경계 면을 추출할지 여부
-  :param extract_opening_volume: opening을 부피 혹은 면으로 추출하는 옵션
-  :param hash_upper: face 구분에 사용되는 hash의 최댓값
-  :param tol: opening face 구분에 사용되는 거리 허용 오차
-  :return:
+  Returns
+  -------
+  Optional[list]
+      Valid sourfaces list
   """
   converter = ObjConverter(compound=compound,
                            space=space,

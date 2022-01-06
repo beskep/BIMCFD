@@ -1,3 +1,4 @@
+# pylint: disable=no-name-in-module
 import os.path
 
 from kivy.properties import BooleanProperty, ObjectProperty, StringProperty

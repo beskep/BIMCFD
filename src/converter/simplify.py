@@ -1,6 +1,6 @@
 from collections.abc import Iterable
 from itertools import chain
-from typing import List, Tuple, Union
+from typing import List, Optional, Tuple, Union
 
 import utils
 
@@ -9,9 +9,9 @@ from OCC.Core.BRepAlgoAPI import BRepAlgoAPI_Cut
 from OCC.Core.BRepCheck import BRepCheck_Analyzer
 from OCC.Core.BRepMesh import BRepMesh_IncrementalMesh
 from OCC.Core.gp import gp_Pnt, gp_Vec
-from OCC.Core.TopoDS import TopoDS_Face, TopoDS_Shape
+from OCC.Core.TopoDS import TopoDS_Compound, TopoDS_Face, TopoDS_Shape
 from OCC.Extend.TopologyUtils import TopologyExplorer
-from scipy.spatial import ConvexHull
+from scipy.spatial import ConvexHull  # pylint: disable=no-name-in-module
 
 from converter import geom_utils
 from OCCUtils.Common import GpropsFromShape
@@ -19,12 +19,18 @@ from OCCUtils.Construct import compound, make_plane
 from OCCUtils.face import Face
 
 
-def flat_face_info(faces: List[TopoDS_Shape]):
+def flat_face_info(faces: List[TopoDS_Face]):
   """
   평면 (face)의 목록을 받아서 표면 단순화에 필요한 face의 정보 반환
 
-  :param faces: face 리스트
-  :return: (면적, 법선 벡터, 법선 벡터 (gp_Vec), 중앙점, 중앙점 (gp_Pnt), 평면)
+  Parameters
+  ----------
+  faces : List[TopoDS_Shape]
+
+  Returns
+  -------
+  tuple
+      (면적, 법선 벡터, 법선 벡터 (gp_Vec), 중앙점, 중앙점 (gp_Pnt), 평면)
   """
 
   planes = geom_utils.planes_from_faces(faces)
@@ -46,12 +52,18 @@ def flat_face_info(faces: List[TopoDS_Shape]):
   return areas, norms, norm_gp_vec, center, center_gp_pnts
 
 
-def curved_face_info(faces: List[TopoDS_Shape]):
+def curved_face_info(faces: List[TopoDS_Face]):
   """
   곡면 (face)의 목록을 받아서 표면 단순화에 필요한 face의 정보 반환
 
-  :param faces: face 리스트
-  :return: (면적, 법선 벡터, 법선 벡터 (gp_Vec), 중앙점, 중앙점 (gp_Pnt), 평면)
+  Parameters
+  ----------
+  faces : List[TopoDS_Shape]
+
+  Returns
+  -------
+  tuple
+      (면적, 법선 벡터, 법선 벡터 (gp_Vec), 중앙점, 중앙점 (gp_Pnt), 평면)
   """
   vertices_gp = geom_utils.get_faces_vertices(faces)
   vectors = [[gp_Vec(x, y), gp_Vec(x, z)] for x, y, z in vertices_gp]
@@ -77,11 +89,11 @@ def curved_face_info(faces: List[TopoDS_Shape]):
 def face_info(faces: List[TopoDS_Face]):
   planes = geom_utils.planes_from_faces(faces)
 
-  if any([plane is None for plane in planes]):
+  if any(plane is None for plane in planes):
     # 곡면이 존재하는 경우
     curved_idx = [i for i, x in enumerate(planes) if x is None]
     curved_faces = [faces[i] for i in curved_idx]
-    flat_faces = [faces[i] for i, x in enumerate(faces) if i not in curved_idx]
+    flat_faces = [faces[i] for i in range(len(faces)) if i not in curved_idx]
 
     # 평면 정보 추출
     areas, norms, norm_gp, center, center_gp = flat_face_info(flat_faces)
@@ -116,16 +128,28 @@ def classify_minor_faces(area: np.ndarray,
   merge_minor_faces()를 위해 단순화 대상 face (minor face)와 단순화 하지 않는
   주요 face (major face)를 구분
 
-  :param area: face의 면적
-  :param center: face의 중심 좌표
-  :param norm: face의 법선 벡터
-  :param threshold_dist: minor face 판단 거리 기준
-  :param threshold_cos: minor face 판단 각도 기준 (cos theta)
-  :param openings: opening의 face 리스트. 지정할 경우 minor face로 분류되지 않음
-  :return: minor face의 index set
+  Parameters
+  ----------
+  area : np.ndarray
+      face의 면적
+  center : np.ndarray
+      face의 중심 좌표
+  norm : np.ndarray
+      face의 법선 벡터
+  threshold_dist : float
+      minor face 판단 거리 기준
+  threshold_cos : float
+      minor face 판단 각도 기준 (cos theta)
+  openings : list, optional
+      opening의 face 리스트. 지정할 경우 minor face로 분류되지 않음.
+
+  Returns
+  -------
+  set
+      minor face의 index set
   """
   faces_idx = np.arange(area.shape[0])
-  opening_face_idx = None
+  opening_face_idx = set()
 
   # 법선 벡터 정규화
   norm = norm / np.linalg.norm(norm, axis=1).reshape([-1, 1])
@@ -135,13 +159,12 @@ def classify_minor_faces(area: np.ndarray,
   avg_cos = avg_cos.reshape([norm.shape[0], norm.shape[0], norm.shape[1]])
   avg_cos = np.sum(norm * avg_cos, axis=2)
   avg_cos = np.average(np.abs(avg_cos), axis=1, weights=area)
-  # avg_cos = np.average(np.square(avg_cos), axis=1, weights=area)
-  # avg_cos = np.max(np.abs(avg_cos) * area, axis=1)
 
   if openings:
-    opening_faces = chain.from_iterable(
-        [TopologyExplorer(opening).faces() for opening in openings])
-    opening_faces = list(set(opening_faces))
+    opening_faces = list(
+        set(
+            chain.from_iterable(
+                [TopologyExplorer(opening).faces() for opening in openings])))
     op_area, op_norm, _, op_center, _ = face_info(opening_faces)
 
     op_norm = op_norm / np.linalg.norm(op_norm, axis=1).reshape([-1, 1])
@@ -180,7 +203,7 @@ def classify_minor_faces(area: np.ndarray,
   # 판단 순서는 1. 면적이 큰 순서대로,
   # 면적이 동일할 경우 2. 다른 면들과 각도가 비슷한 순서대로
   # TODO: opening face는 아예 기준에서 빼버리기?
-  for idx in np.lexsort([-avg_cos, -area]):
+  for idx in np.lexsort([-avg_cos, -area]):  # pylint: disable=invalid-unary-operand-type
     if idx in minor_faces or (openings and idx in opening_face_idx):
       continue
 
@@ -210,33 +233,41 @@ def merge_inner_volume(
     shape: TopoDS_Shape,
     threshold_internal_volume=0.0,
     threshold_internal_length: Union[float, list, np.ndarray] = 0.0,
-    brep_deflection: Union[Tuple[float], float] = (1.0, 0.5),
+    brep_deflection=(1.0, 0.5),
     tol_bbox=1e-8,
     tol_cut=0.0,
-):
+) -> Optional[TopoDS_Shape]:
   """
-  shape의 내부 빈 공간 (e.g. 기둥) 중 기준을 충족하는 공간을 단순화
-  단순화 대상 공간이 없으면 None을 반환
+  shape의 내부 빈 공간 (e.g. 기둥) 중 기준을 충족하는 공간을 단순화.
+  단순화 대상 공간이 없으면 None을 반환.
   내부 공간이 복잡하여 (직육면체 형상이 아니어서) 여러 shape으로 분할될 경우
-  원하지 않는 빈 공간이 생략될 수 있음
-  B-rep 형성한 shape 넣지 말것
+  원하지 않는 빈 공간이 생략될 수 있음.
+  B-rep 형성한 shape 넣지 말것.
 
-  :param shape: 단순화 대상 shape
-  :param threshold_internal_volume:
-  기준 부피. 해당 수치 이하의 내부 빈 공간은 삭제함.
-  :param threshold_internal_length:
-  기준 길이. 내부 빈 공간의 edge 중 하나 이상
-  해당 수치보다 작은 게 있으면 해당 공간을 삭제함.
-  :param brep_deflection: BRepMesh_IncrementalMesh의 옵션.
-  (linear_deflection, angular_deflection) 혹은 linear_deflection.
-  :param tol_bbox: Bounding box 허용 오차
-  :param tol_cut: BRepAlgoAPI_Cut의 허용 오차
-  :return: 단순화의 필요가 없을 경우 None,
-  단순화를 시행한 경우 단순화 한 TopoDS_Shape 반환
+  Parameters
+  ----------
+  shape : TopoDS_Shape
+      단순화 대상 shape
+  threshold_internal_volume : float, optional
+      기준 부피. 해당 수치 이하의 내부 빈 공간은 삭제함.
+  threshold_internal_length : Union[float, list, np.ndarray], optional
+      기준 길이. 내부 빈 공간의 edge 중 하나 이상 해당 수치보다 작은 게 있으면
+      해당 공간을 삭제함.
+  brep_deflection : tuple, optional
+      BRepMesh_IncrementalMesh의 옵션. (linear_deflection, angular_deflection)
+      혹은 linear_deflection.
+  tol_bbox : float, optional
+      Bounding box 허용 오차
+  tol_cut : float, optional
+      BRepAlgoAPI_Cut의 허용 오차
+
+  Returns
+  -------
+  Optional[TopoDS_Shape]
   """
   assert threshold_internal_volume >= 0.0
   if isinstance(threshold_internal_length, Iterable):
-    assert all([x >= 0.0 for x in threshold_internal_length])
+    assert all(x >= 0.0 for x in threshold_internal_length)
   else:
     assert threshold_internal_length >= 0.0
 
@@ -250,8 +281,8 @@ def merge_inner_volume(
 
   flag_simplify = True
   simplified_shape = None
-  solids_cut = None
-  inner_solids = None
+  solids_cut = []
+  inner_solids = []
 
   # space를 둘러싸는 bounding box 생성
   bbox_pnts = geom_utils.get_boundingbox(shape, tol=tol_bbox)
@@ -346,33 +377,51 @@ def merge_inner_volume(
   return simplified_shape
 
 
-def merge_minor_faces(shape: TopoDS_Shape,
-                      threshold_dist: float,
-                      threshold_angle: float,
-                      threshold_vol_ratio=0.5,
-                      openings: List[TopoDS_Shape] = None,
-                      brep_deflection: Union[Tuple[float], float] = (1.0, 0.5),
-                      tol_bbox=1e-8,
-                      buffer_size=2,
-                      split_limit=None):
+def merge_minor_faces(
+    shape: TopoDS_Shape,
+    threshold_dist: float,
+    threshold_angle: float,
+    threshold_vol_ratio=0.5,
+    openings: List[TopoDS_Shape] = None,
+    brep_deflection: Union[Tuple[float, float], float] = (1.0, 0.5),
+    tol_bbox=1e-8,
+    buffer_size=2,
+    split_limit=None,
+) -> Optional[TopoDS_Compound]:
   """
   비슷한 face를 통합하여 형상을 단순화
-  Ref: Kada, M. (2006). 3D building generalization based on half-space modeling.
+
+  References
+  ----------
+  Kada, M. (2006). 3D building generalization based on half-space modeling.
   International Archives of Photogrammetry, Remote Sensing and Spatial
   Information Sciences, 36(2), 58-64.
 
-  :param shape: 단순화를 시행할 대상 shape
-  :param threshold_dist: 통합할 face의 최대 거리
-  :param threshold_angle: 통합할 face의 최대 각도 차 [rad]
-  :param threshold_vol_ratio: 분할한 공간 중 추출 여부를 판단하기 위한 부피 비율
-  :param openings: 표면 단순화를 하지 않을 Opening의 목록
-  :param brep_deflection: BRepMesh_IncrementalMesh의 옵션.
-  (linear_deflection, angular_deflection) 혹은 linear_deflection.
-  :param tol_bbox: Bounding box의 허용 오차
-  :param buffer_size: Bounding box에 대한 buffer의 상대 크기
-  :param split_limit: 분할하는 face 수가 해당 수 이상일 경우 순차적으로 분할 시행
-  :return: 단순화의 필요가 없을 경우 None을,
-  단순화를 시행한 경우 단순화 한 TopoDS_Shape 반환
+  Parameters
+  ----------
+  shape : TopoDS_Shape
+      단순화를 시행할 대상 shape
+  threshold_dist : float
+      통합할 face의 최대 거리
+  threshold_angle : float
+      통합할 face의 최대 각도 차 [rad]
+  threshold_vol_ratio : float, optional
+      분할한 공간 중 추출 여부를 판단하기 위한 부피 비율
+  openings : List[TopoDS_Shape], optional
+      표면 단순화를 하지 않을 Opening의 목록
+  brep_deflection : Union[Tuple[float, float], float], optional
+      BRepMesh_IncrementalMesh의 옵션. (linear_deflection, angular_deflection)
+      혹은 linear_deflection.
+  tol_bbox : float, optional
+      Bounding box의 허용 오차
+  buffer_size : int, optional
+      Bounding box에 대한 buffer의 상대 크기
+  split_limit : int, optional
+      분할하는 face 수가 해당 수 이상일 경우 순차적으로 분할 시행
+
+  Returns
+  -------
+  Optional[TopoDS_Compound]
   """
   assert threshold_dist >= 0.0
   assert 0.0 <= threshold_angle <= np.pi / 2.0
@@ -385,13 +434,16 @@ def merge_minor_faces(shape: TopoDS_Shape,
 
   shape = geom_utils.fuse_compound(shape)
 
-  if brep_deflection:
+  if not brep_deflection:
+    bd = None
+  else:
     if isinstance(brep_deflection, float):
-      brep_deflection = (brep_deflection, 0.5)
+      bd = (brep_deflection, 0.5)
+    else:
+      bd = brep_deflection
 
     for shape_ in [shape] + (list(openings) if openings else []):
-      BRepMesh_IncrementalMesh(shape_, brep_deflection[0], False,
-                               brep_deflection[1], True)
+      BRepMesh_IncrementalMesh(shape_, bd[0], False, bd[1], True)
 
   # face 간 각도 기준
   threshold_cos = np.cos(threshold_angle)
@@ -472,10 +524,9 @@ def merge_minor_faces(shape: TopoDS_Shape,
     #                for x in buffer_solids]
 
     # 분할된 buffer의 solid 중 원본 shape의 비중이 기준 이상인 경우만 추출
-    simplified_shape = [
+    simplified_shape = compound([
         s for s, r in zip(buffer_solids, vol_ratio) if r >= threshold_vol_ratio
-    ]
-    simplified_shape = compound(simplified_shape)
+    ])
 
     # if fuzzy:
     #   simplified_shape = fix_shape(simplified_shape)
@@ -485,9 +536,8 @@ def merge_minor_faces(shape: TopoDS_Shape,
     #   simplified_shape = maker_volume(
     #     list(TopologyExplorer(simplified_shape).faces()), fuzzy=fuzzy)
 
-    if brep_deflection:
-      BRepMesh_IncrementalMesh(simplified_shape, brep_deflection[0], False,
-                               brep_deflection[1], True)
+    if bd:
+      BRepMesh_IncrementalMesh(simplified_shape, bd[0], False, bd[1], True)
 
   else:
     # 단순화의 필요가 없는 경우
@@ -511,35 +561,55 @@ def simplify_space(
     tol_cut=0.0,
     buffer_size=2,
     split_limit=None,
-) -> TopoDS_Shape:
+) -> Optional[TopoDS_Shape]:
   """
   형상 단순화 함수. 내부 빈 공간 단순화와 외부 표면 단순화를 순차적으로 실행
 
-  표면 단순화 Ref:
+  References
+  ----------
   Kada, M. (2006). 3D building generalization based on half-space modeling.
   International Archives of Photogrammetry, Remote Sensing and Spatial
   Information Sciences, 36(2), 58-64.
 
-  :param shape: 단순화 대상 shape
-  :param openings: 표면 단순화를 하지 않을 Opening의 목록
-  :param brep_deflection: BRep mesh의 옵션. None일 경우 mesh를 다시 하지 않음.
-  linear_deflection 또는 (linear_deflection, angular_deflection)
-  :param threshold_internal_volume: 내부 공간의 단순화 기준 부피
-  :param threshold_internal_length: 내부 공간의 단순화 기준 길이.
-  내부 공간의 edge 중 하나 이상 기준 길이보다 짧은 edge가 있으면 해당 공간을 생략.
-  :param threshold_surface_dist: 표면 단순화의 기준 길이.
-  :param threshold_surface_angle: 표면 단순화의 기준 각도 [rad]
-  :param threshold_surface_vol_ratio: 표면 단순화의 기준 부피비
-  :param relative_threshold: True일 경우,
-      threshold_internal_volume는 shape의 부피 대비 비율,
-      threshold_internal_length는 shape의 특성길이 (부피 / 표면적) 대비 비율로 계산함.
-  :param fuzzy: fuzzy operation 옵션
-  :param tol_bbox: bounding box 허용 오차
-  :param tol_cut: BRepAlgoAPI_Cut의 허용 오차
-  :param buffer_size: bounding box 대비 버퍼 크기
-  :param split_limit: 분할하는 face 수가 해당 수 이상일 경우 순차적으로 분할 시행
-  :return: 형상 단순화를 시행했다면 단순화된 TopoDS_Shape,
-  단순화가 필요 없다면 None 반환
+  Parameters
+  ----------
+  shape : TopoDS_Shape
+      단순화 대상 shape
+  openings : List[TopoDS_Shape], optional
+      표면 단순화를 하지 않을 Opening의 목록
+  brep_deflection : tuple, optional
+      BRep mesh의 옵션. None일 경우 mesh를 다시 하지 않음.
+      (linear_deflection, angular_deflection)
+  threshold_internal_volume : float, optional
+      내부 공간의 단순화 기준 부피.
+  threshold_internal_length : Union[float, list, np.ndarray], optional
+      내부 공간의 단순화 기준 길이. 내부 공간의 edge 중 하나 이상 기준 길이보다
+      짧은 edge가 있으면 해당 공간을 생략.
+  threshold_surface_dist : float, optional
+      표면 단순화의 기준 길이.
+  threshold_surface_angle : float, optional
+      표면 단순화의 기준 각도 [rad]
+  threshold_surface_vol_ratio : float, optional
+      표면 단순화의 기준 부피비
+  relative_threshold : bool, optional
+      `True`일 경우, threshold_internal_volume는 shape의 부피 대비 비율,
+      threshold_internal_length는 shape의 특성길이 (부피 / 표면적)
+      대비 비율로 계산함.
+  fuzzy : float, optional
+      fuzzy operation 옵션
+  tol_bbox : float, optional
+      bounding box 허용 오차
+  tol_cut : float, optional
+      BRepAlgoAPI_Cut의 허용 오차
+  buffer_size : int, optional
+      bounding box 대비 버퍼 크기
+  split_limit : int, optional
+      분할하는 face 수가 해당 수 이상일 경우 순차적으로 분할 시행
+
+  Returns
+  -------
+  Optional[TopoDS_Shape]
+      형상 단순화를 시행했다면 단순화된 TopoDS_Shape, 단순화가 필요 없다면 None 반환
   """
   flag_simplified = False
 
@@ -587,10 +657,10 @@ def simplify_space(
       flag_simplified = True
       shape = geom_utils.fix_shape(simplified_shape)
 
-  if flag_simplified:
+  if not flag_simplified:
+    result = None
+  else:
     # result = maker_volume(list(TopologyExplorer(shape).faces()), fuzzy=fuzzy)
     result = shape
-  else:
-    result = None
 
   return result

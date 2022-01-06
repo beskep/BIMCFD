@@ -32,8 +32,6 @@ from OCCUtils.Common import GpropsFromShape
 from OCCUtils.Construct import compound, face_normal, make_plane
 from OCCUtils.face import Face
 
-# todo: tqdm 지우기
-
 
 def make_box(*args):
   box = BRepPrimAPI_MakeBox(*args)
@@ -99,16 +97,26 @@ def maker_volume_sequential(shape,
   return shape
 
 
-def maker_volume(shapes: Collection, boundary: TopoDS_Shape = None, fuzzy=0.0):
+def maker_volume(shapes: Collection,
+                 boundary: TopoDS_Shape = None,
+                 fuzzy=0.0) -> Union[TopoDS_Shape, TopoDS_Compound]:
   """
   BOPAlgo_MakerVolume
   https://github.com/tpaviot/pythonocc-core/issues/554
 
-  :param shapes: Volume을 만드는데 사용되는 shape의 목록
-  :param boundary: Optional, 지정 시 결과 중
-  boundary 내부에 존재하는 solid만 모아 compound를 만들어 반환
-  :param fuzzy: BOPAlgo_MakerVolume의 fuzzy 옵션
-  :return:
+  Parameters
+  ----------
+  shapes : Collection
+      Volume을 만드는데 사용되는 shape 목록
+  boundary : TopoDS_Shape, optional
+      지정 시 결과 중 boundary 내부에 존재하는 solid만 모아 compound를 만들어 반환,
+      by default None
+  fuzzy : float, optional
+      BOPAlgo_MakerVolume의 fuzzy 옵션, by default 0.0
+
+  Returns
+  -------
+  Union[TopoDS_Shape, TopoDS_Compound]
   """
   if len(shapes) > 1:
     shapes = np.array(shapes)

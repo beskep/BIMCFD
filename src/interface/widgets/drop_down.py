@@ -1,3 +1,4 @@
+# pylint: disable=no-name-in-module
 import itertools
 
 from kivy.lang.builder import Builder

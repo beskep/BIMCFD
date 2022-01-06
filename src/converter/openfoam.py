@@ -2,7 +2,7 @@ from collections import OrderedDict, namedtuple
 from itertools import chain
 from pathlib import Path
 from shutil import copy2, rmtree
-from typing import List, Tuple
+from typing import List, Optional, Tuple, Union
 
 import utils
 
@@ -54,6 +54,8 @@ _PARALLEL_RUN_SH = (b'mpirun -np %s %s -parallel | tee log.run\n'
                     b'postProcess -func "mag(U)"\n'
                     b'foamLog log.run')
 
+StrPath = Union[str, Path]
+
 
 def supported_solvers(energy=False,
                       conductivity=False,
@@ -67,12 +69,10 @@ def supported_solvers(energy=False,
   if turbulence:
     solvers = solvers.intersection(set(_SOLVERS_TURBULENCE))
 
-  solvers = sorted(list(solvers))
-
-  return solvers
+  return sorted(solvers)
 
 
-def load_case_files(folder, fullpath=False):
+def load_case_files(folder):
   """load openfoam files from a folder."""
   folder = Path(folder).resolve()
   files = []
@@ -145,15 +145,12 @@ class OpenFoamCase(ButterflyCase):
   MINFOAMFIles = ('fvSchemes', 'fvSolution', 'controlDict')
 
   def __init__(self,
-               name: str,
-               working_dir: str,
-               foamfiles: list = None,
-               geometries: list = None):
-    if foamfiles is None:
-      foamfiles = []
-
-    if geometries is None:
-      geometries = []
+               name: StrPath,
+               working_dir: StrPath,
+               foamfiles: Optional[list] = None,
+               geometries: Optional[list] = None):
+    foamfiles = foamfiles or []
+    geometries = geometries or []
 
     super().__init__(name=name, foamfiles=foamfiles, geometries=geometries)
 
@@ -209,22 +206,37 @@ class OpenFoamCase(ButterflyCase):
         p=p, convertToMeters=convert_to_meters)
 
   @classmethod
-  def from_folder(cls, path, working_dir, name=None, convert_from_meters=1):
-    """Create a Butterfly case from a case folder.
+  def from_folder(cls,
+                  path: StrPath,
+                  working_dir: StrPath,
+                  name: Optional[str] = None,
+                  convert_from_meters=1):
+    """
+    [summary]
 
-    Args:
-        path: Full path to case folder.
-        name: An optional new name for this case.
-        convert_from_meters: A number to be multiplied to stl file vertices
-            to be converted to the new units if not meters. This value will
-            be the inverse of convertToMeters.
+    Parameters
+    ----------
+    path : StrPath
+        Full path to case folder.
+    working_dir : StrPath
+        Working directory.
+    name : Optional[str], optional
+        An optional new name for this case, by default None
+    convert_from_meters : int, optional
+        A number to be multiplied to stl file vertices
+        to be converted to the new units if not meters.
+        This value will be the inverse of convertToMeters.
+
+    Returns
+    -------
+    OpenFoamCase
     """
     # collect foam files
     __originalName = Path(path).stem
     if not name:
       name = __originalName
 
-    _files = load_case_files(path, fullpath=True)
+    _files = load_case_files(path)
 
     # convert files to butterfly objects
     ff = []
@@ -283,16 +295,19 @@ class OpenFoamCase(ButterflyCase):
     return _case
 
   def save(self, overwrite=False, minimum=False):
-    """Save case to folder.
+    """
+    Save case to folder
 
-    Args:
-        overwrite: If True all the current content will be overwritten
-            (default: False).
-        minimum: Write minimum necessary files for case. These files will
-            be enough for meshing the case but not running any commands.
-            Files are ('fvSchemes', 'fvSolution', 'controlDict',
-            'blockMeshDict','snappyHexMeshDict'). Rest of the files will be
-            created from a Solution.
+    Parameters
+    ----------
+    overwrite : bool, optional
+        If True all the current content will be overwritten.
+    minimum : bool, optional
+        Write minimum necessary files for case. These files will
+        be enough for meshing the case but not running any commands.
+        Files are ('fvSchemes', 'fvSolution', 'controlDict',
+        'blockMeshDict','snappyHexMeshDict'). Rest of the files will be
+        created from a Solution.
     """
     # create folder and subfolders if they are not already created
     proj_dir = self.project_dir
@@ -305,7 +320,7 @@ class OpenFoamCase(ButterflyCase):
       if not p.exists():
         try:
           p.mkdir()
-        except Exception as e:
+        except OSError as e:
           msg = 'Failed to create foam file {}\n\t{}'.format(p, e)
 
           if str(e).startswith('[Error 183]'):
@@ -355,7 +370,8 @@ class OpenFoamCase(ButterflyCase):
 
     # mesh.sh
     mesh_path = proj_dir.joinpath('mesh.sh')
-    with open(mesh_path, 'wb') as f:
+    with mesh_path.open('wb') as f:
+      # TODO mypy error: test
       f.write(_MESH_SH)
 
     # decomposeParDict, run.sh
@@ -371,11 +387,11 @@ class OpenFoamCase(ButterflyCase):
       run_sh = _RUN_SH % solver.encode()
 
     run_path = proj_dir.joinpath('run.sh')
-    with open(run_path, 'wb') as f:
+    with run_path.open('wb') as f:
       f.write(run_sh)
 
     # simulate
-    with open(proj_dir.joinpath('simulate'), 'wb') as f:
+    with proj_dir.joinpath('simulate').open('wb') as f:
       f.write(b'./mesh.sh\n./run.sh')
 
   def change_boundary_field(self, variable, boundary_field: BoundaryFieldDict):

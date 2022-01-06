@@ -47,8 +47,8 @@ def _get_faces_vertices(faces: list) -> List[List[gp.gp_Pnt]]:
   :param faces:
   :return: list[[gp_pnt, gp_pnt, gp_pnt]
   """
-  vertices = [_get_face_vertices(face) for face in faces]
-  vertices = list(chain.from_iterable(vertices))
+  vertices = list(
+      chain.from_iterable((_get_face_vertices(face) for face in faces)))
 
   return vertices
 

@@ -2,7 +2,7 @@ import os
 from collections import OrderedDict, defaultdict
 from itertools import chain, combinations
 from shutil import copy2
-from typing import Iterable, List, Tuple, Union
+from typing import Iterable, List, Optional, Tuple, Union
 
 import utils
 
@@ -147,11 +147,10 @@ class IfcConverter:
   def create_geometry(self, entity: IfcEntity):
     return ifcopenshell.geom.create_shape(self.settings, entity).geometry
 
-  def get_relating_space(self, target: Union[int, IfcEntity]):
-    """
-    :param target: int일 경우 entity의 id
-    :return: List[IfcEntity]
-    """
+  def get_relating_space(
+      self,
+      target: Union[int, IfcEntity],
+  ) -> List[IfcEntity]:
     if isinstance(target, int):
       target = self._ifc.by_id(target)
 
@@ -160,9 +159,12 @@ class IfcConverter:
 
     return relating_space
 
-  def get_space_wall_dict(self):
+  def get_space_wall_dict(self) -> defaultdict:
     """
-    :return: defaultdict, {space: List[wall]}
+    Returns
+    -------
+    defaultdict
+        {space: List[wall]}
     """
     spaces_walls = defaultdict(set)
 
@@ -198,7 +200,7 @@ class IfcConverter:
     return intersection
 
   def get_openings(self, wall: IfcEntity):
-    assert any([wall.is_a(x) for x in self._ifc_types_wall])
+    assert any(wall.is_a(x) for x in self._ifc_types_wall)
 
     shapes = []
     for opening in wall.HasOpenings:
@@ -353,8 +355,8 @@ class IfcConverter:
       bf = BoundaryFieldDict(width=width)
 
       if min_score:
-        is_extracted = bool(conductivity[idx]) and all(
-            [min_score <= x for x in score[idx]])
+        is_extracted = (bool(conductivity[idx]) and
+                        all(min_score <= x for x in score[idx]))
       else:
         is_extracted = bool(conductivity[idx])
 
@@ -443,7 +445,6 @@ class IfcConverter:
     -------
     OrderedDict
         T.boundaryField
-
     """
     if surface_name is None:
       surface_name = ['Surface_' + str(x) for x in range(len(surface))]
@@ -646,10 +647,7 @@ class IfcConverter:
              List[TopoDS_Shape]]:
     if not isinstance(targets, Iterable):
       targets = [targets]
-
-    for idx in range(len(targets)):
-      if isinstance(targets[idx], int):
-        targets[idx] = self.ifc.by_id(int(targets[idx]))
+    targets = [self.ifc.by_id(x) if isinstance(x, int) else x for x in targets]
 
     boundaries = set(chain.from_iterable([get_bounded_by(x) for x in targets]))
     walls = [x for x in boundaries if x is not None and x.is_a('IfcWall')]
@@ -683,7 +681,7 @@ class IfcConverter:
           if dist is not None and dist < tol
       ]
 
-      assert all([dist is not None for dist in distance])
+      assert all(dist is not None for dist in distance)
 
       for opening in openings:
         builder_shape.Add(shape, opening)
@@ -699,6 +697,7 @@ class IfcConverter:
                      relative_threshold=True,
                      preserve_opening=True,
                      opening_volume=True):
+    openings: Optional[List[TopoDS_Shape]]
     shape, space, walls, openings = self.convert_space(spaces)
     wall_names = self.component_code(walls, 'W')
 
@@ -1081,7 +1080,9 @@ def get_bounded_by(space: IfcEntity):
     raise ValueError('Need IfcSpace, not {}'.format(space.is_a()))
 
   try:
-    boundaries = [x.RelatedBuildingElement for x in space.BoundedBy]
+    boundaries: Optional[list] = [
+        x.RelatedBuildingElement for x in space.BoundedBy
+    ]
   except AttributeError:
     boundaries = None
 

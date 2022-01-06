@@ -1,9 +1,11 @@
+from typing import Callable, Optional
+
 from OCC.Display import OCCViewer, SimpleGui
 
 
 class Vis:
-  _display: OCCViewer.Viewer3d = None
-  _start = None
+  _display: Optional[OCCViewer.Viewer3d] = None
+  _start: Optional[Callable] = None
 
   @classmethod
   def init_display(cls, **kwargs):
@@ -50,4 +52,5 @@ class Vis:
 
   @classmethod
   def start_display(cls):
+    # pylint: disable=not-callable
     cls._start()

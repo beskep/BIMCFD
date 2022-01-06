@@ -193,13 +193,7 @@ def stl_list(path, fuzzy=None):
 
 
 def read_from_stl(path, interior=False):
-  """
-  interior가 포함된 stl 읽고 interior를 제거 시도...
-
-  :param path:
-  :param interior:
-  :return: 
-  """
+  """interior가 포함된 stl 읽고 interior를 제거 시도..."""
   shape = DataExchange.read_stl_file(path)
 
   if not interior:
@@ -436,50 +430,3 @@ def characteristic_length(path):
   df['cl'] = df['volume'] / df['area']
 
   return df
-
-
-if __name__ == '__main__':
-  base_dir = r'D:\Python\IFCConverter\IFCConverter' \
-             r'\result\mesh_quality'
-  size = 1000_000
-  # size = 100
-
-  # Vis._init_display()
-  # Vis.start_display()
-  # os.system('pause')
-
-  p_case = re.compile(r'^\[[0-9]+\].*')
-  cl = []
-
-  for root, dirs, files in os.walk(base_dir):
-    # print(root)
-    prj = os.path.split(root)[1]
-
-    for directory in dirs:
-      if not p_case.match(directory):
-        continue
-
-      print(os.path.join(root, directory))
-      df_path = os.path.join(r'D:\Python\IFCConverter\IFCConverter\result',
-                             'd2_{}_{}.csv'.format(prj, directory))
-
-      # if ('Hospital_Parking Garage' in prj) or ('Conference Center' in prj):
-      #   continue
-
-      # cl_path = '../result/mesh_quality/cl_{}_{}.csv'.format(prj, directory)
-      # cl_case = characteristic_length(os.path.join(root, directory))
-      # cl_case.to_csv(cl_path, index=False)
-      # cl.append(cl_case)
-
-      # visualize_seq(os.path.join(root, directory))
-
-      if not os.path.isfile(df_path):
-        df = calculate_d2_similarity_seq(os.path.join(root, directory),
-                                         size=size,
-                                         fuzzy=None,
-                                         verbose=True)
-        if df is not None:
-          df.to_csv(df_path)
-
-  # cl_df = pd.concat(cl, ignore_index=True)
-  # cl_df.to_csv('../result/mesh_quality/cl.csv', index=False)

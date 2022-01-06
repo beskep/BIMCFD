@@ -6,7 +6,7 @@ import numpy as np
 from kivy import graphics
 from kivy.app import App
 from kivy.clock import Clock
-from kivy.graphics.transformation import Matrix
+from kivy.graphics.transformation import Matrix  # pylint: disable=no-name-in-module
 from kivy.resources import resource_find
 from kivy.uix.widget import Widget
 

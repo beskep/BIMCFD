@@ -1,5 +1,6 @@
 import json
 import re
+from typing import Tuple
 
 from utils import DIR
 
@@ -42,12 +43,12 @@ def match_insulation(material, prop):
 class MaterialMatch:
 
   def __init__(self, db_path=None, kor_eng_path=None):
-    if db_path is None:
-      db_path = DB_PATH
-    if kor_eng_path is None:
-      kor_eng_path = KOR_ENG_PATH
+    db_path = db_path or DB_PATH
+    kor_eng_path = kor_eng_path or KOR_ENG_PATH
 
-    self._db = pd.read_csv(db_path, engine='python', na_values='-')
+    self._db: pd.DataFrame = pd.read_csv(db_path,
+                                         engine='python',
+                                         na_values='-')
     self._names = list(self._db['Name'])
     self._korean_pattern = re.compile('[ㄱ-ㅎㅏ-ㅣ가-힣]')
     self._kor_eng: dict = load_kor_eng(kor_eng_path)
@@ -70,6 +71,8 @@ class MaterialMatch:
     return count
 
   def to_english_material(self, material_name: str):
+    eng_name: str
+    score: int
     if self.has_korean(material_name):
       matched_korean, score = extractOne(query=material_name,
                                          choices=self._kor_eng.keys(),
@@ -77,32 +80,28 @@ class MaterialMatch:
       eng_name = self._kor_eng[matched_korean]
     else:
       eng_name = material_name
-      score = None
+      score = 0
 
     return eng_name, score
 
-  def friction(self, material_name: str):
-    """ 이름이 가장 유사한 재료의 조도 반환
+  def friction(self, material_name: str) -> Tuple[float, str, str, int]:
+    """
+    이름이 가장 유사한 재료의 조도 반환
     입력값이 False인 경우 모든 입력값 None
-    
+
     Parameters
     ----------
-    material_name: str
-      재료 이름
+    material_name : str
 
     Returns
     -------
-    tuple: tuple containing:
+    Tuple[float, str, str, int]
       roughness: float, 조도 [m]
       english_name: str, 영어 재료명 (입력값이 영어인 경우 동일)
       nearest_name: str, DB와 매칭된 재료명
       score: int, 영어 재료명의 매칭 점수 (0-100)
-
     """
-    if not material_name:
-      return None, None, None, None
-
-    eng_name, eng_score = self.to_english_material(material_name)
+    eng_name, _ = self.to_english_material(material_name)
 
     nearest_material = friction.nearest_material_roughness(eng_name)
     roughness = friction.material_roughness(nearest_material)
@@ -110,7 +109,7 @@ class MaterialMatch:
 
     return roughness, eng_name, nearest_material, score
 
-  def thermal_properties(self, material_name: str):
+  def thermal_properties(self, material_name: str) -> Tuple[dict, str, str]:
     """이름이 가장 유사한 재료의 열적 특성 반환
 
     Parameters
@@ -120,7 +119,7 @@ class MaterialMatch:
 
     Returns
     -------
-    tuple: tuple containing:
+    Tuple[dict, str, str]
       properties: dict,
         {'rho': density [kg/m^3],
          'Cp': specific heat [J/kgK],
@@ -128,7 +127,7 @@ class MaterialMatch:
       english_name: str, 영어 재료명 (입력값이 영어인 경우 동일)
       nearest_name: str, DB와 매칭된 재료명
     """
-    eng_name, score = self.to_english_material(material_name)
+    eng_name, _ = self.to_english_material(material_name)
 
     nearest_ht = insulation.nearest_material(eng_name)
     score_ht = self._scorer(eng_name, nearest_ht)
@@ -141,7 +140,7 @@ class MaterialMatch:
       prop = {x: match_insulation(nearest_ht, x) for x in ['rho', 'Cp', 'k']}
       nearest_name = nearest_ht
     else:
-      series = self._db.loc[self._db['Name'] == nearest_db, :].squeeze()
+      series = self._db.loc[self._db.loc['Name'] == nearest_db, :].squeeze()  # pylint: disable=no-member
       prop = {
           'rho': series['Density {kg/m3}'],
           'Cp': series['Specific Heat {J/kg-K}'],

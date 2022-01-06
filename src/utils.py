@@ -3,7 +3,6 @@ import sys
 from pathlib import Path
 from typing import Union
 
-import yaml
 from loguru import logger
 from rich.logging import RichHandler
 
@@ -68,6 +67,7 @@ def set_logger(level: Union[int, str] = 20, handle_kivy_logger=False):
       return
 
     try:
+      # pylint: disable=import-outside-toplevel
       from kivy.logger import Logger as kvlogger
 
       kvlogger.handlers = [

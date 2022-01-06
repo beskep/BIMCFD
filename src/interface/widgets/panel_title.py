@@ -1,3 +1,4 @@
+# pylint: disable=no-name-in-module
 from kivy.metrics import dp
 from kivy.properties import StringProperty
 

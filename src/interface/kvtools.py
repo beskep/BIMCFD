@@ -15,7 +15,7 @@ def config():
 
 
 def activate_inspector():
-  from kivy.config import Config
+  # pylint: disable=import-outside-toplevel
   from kivy.modules import Modules
   from kivy.core.window import Window
 
@@ -54,6 +54,7 @@ def set_window_size(size: tuple):
   size : tuple
       (width, height)
   """
+  # pylint: disable=import-outside-toplevel
   from kivy.core.window import Window
 
   Window.size = size
@@ -70,5 +71,5 @@ def set_window_size(size: tuple):
       Window.left = int((screen_width - size[0]) / 2.0)
       Window.top = int((screen_height - size[1]) / 2.0)
 
-  except Exception:
+  except Exception:  # pylint: disable=broad-except
     pass

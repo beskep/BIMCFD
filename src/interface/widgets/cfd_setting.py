@@ -16,7 +16,7 @@ class CheckOnlyBox(MDCheckbox):
 
   def on_touch_down(self, touch):
     if self.state == 'normal':
-      return super().on_touch_down(touch)
+      super().on_touch_down(touch)
 
 
 class CfdSettingContent(MDBoxLayout):

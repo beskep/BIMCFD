@@ -46,6 +46,9 @@ class IfcEntityText:
   @classmethod
   def index(cls, text: str):
     match = cls.pattern.match(text)
+    if match is None:
+      raise ValueError('Index Error')
+
     index = int(match.group(1))
 
     return index
@@ -69,13 +72,14 @@ class BimCfdApp(BimCfdAppBase):
     self._target_space_id = None
     self._simplified: dict = None
     self._renderer: topo.TopoRenderer = None
+    self._space_menu = None
 
     # todo: 그래픽 관련 method 모두 mainthread로
 
-  def on_start(self):
-    super().on_start()
+  # def on_start(self):
+  #   super().on_start()
 
-    # self.solver_menu.set_items(text=openfoam.supported_solvers())
+  #   self.solver_menu.set_items(text=openfoam.supported_solvers())
 
   def select_path(self, path):
     super().select_path(path)
@@ -88,7 +92,7 @@ class BimCfdApp(BimCfdAppBase):
   def load_ifc(self, path: Path):
     try:
       self._converter = ifccnv.IfcConverter(path=path.as_posix())
-    except Exception:
+    except Exception:  # pylint: disable=broad-except
       self.show_snackbar('IFC 로드 실패')
       logger.exception('IFC 로드 실패')
       return
