@@ -735,8 +735,8 @@ class IfcConverter:
 
     if not any([threshold_volume, threshold_dist, threshold_angle]):
       logger.info('단순화 조건이 설정되지 않았습니다. 원본 형상을 저장합니다.')
-      simplified = shape
-      fused = shape
+      simplified: Optional[TopoDS_Compound] = shape
+      fused: Optional[TopoDS_Compound] = shape
       is_simplified = False
     else:
       try:

@@ -1,4 +1,5 @@
-from typing import List
+# pylint: disable=no-name-in-module
+from typing import List, Optional
 
 import utils
 
@@ -6,7 +7,7 @@ import numpy as np
 from kivy import graphics
 from kivy.app import App
 from kivy.clock import Clock
-from kivy.graphics.transformation import Matrix  # pylint: disable=no-name-in-module
+from kivy.graphics.transformation import Matrix
 from kivy.resources import resource_find
 from kivy.uix.widget import Widget
 
@@ -167,9 +168,9 @@ class TopoRenderer(BaseRenderer):
     perspective : float, optional
         dunno, by default 1.0
     """
-    self._shapes: List = None
-    self._bbox: np.ndarray = None
-    self._topo_center: np.ndarray = None
+    self._shapes: Optional[list] = None
+    self._bbox: Optional[np.ndarray] = None
+    self._topo_center: Optional[np.ndarray] = None
     self._depth = 1.0
 
     self._save_shapes(shapes)

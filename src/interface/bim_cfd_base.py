@@ -28,19 +28,6 @@ from .widgets.text_field import TextFieldPath, TextFieldUnit
 _FONT_STYLES = ('H1', 'H2', 'H3', 'H4', 'H5', 'H6', 'Subtitle1', 'Subtitle2',
                 'Body1', 'Body2', 'Button', 'Caption', 'Overline')
 
-_MATERIALS = (
-    ('Brick (Fired Clay)', 0.675, 790),
-    ('Concrete Block', 0.5624888, 626.8238),
-    ('Gypsum Board', 0.16, 1090),
-    ('Plaster Board', 0.58, 1090),
-    ('Plywood', 0.12, 1210),
-    ('Mineral Fiber Insulation', 0.05, 960),
-    ('Asbestos-cement Board', 0.58, 1000),
-    ('Hardboard (High Density)', 0.82, 1340),
-    ('Heavyweight Concrete', 1.95, 900),
-    ('Lightweight Concrete', 0.53, 840),
-)
-
 
 def with_spinner(fn):
   """BimCfdApp의 method 실행 중 spinner 애니메이션을 보여줌

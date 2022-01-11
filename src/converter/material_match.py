@@ -140,7 +140,7 @@ class MaterialMatch:
       prop = {x: match_insulation(nearest_ht, x) for x in ['rho', 'Cp', 'k']}
       nearest_name = nearest_ht
     else:
-      series = self._db.loc[self._db.loc['Name'] == nearest_db, :].squeeze()  # pylint: disable=no-member
+      series = self._db.loc[self._db['Name'] == nearest_db, :].squeeze()  # pylint: disable=unsubscriptable-object
       prop = {
           'rho': series['Density {kg/m3}'],
           'Cp': series['Specific Heat {J/kg-K}'],

@@ -13,10 +13,11 @@ from OCC.Core.TopoDS import TopoDS_Compound, TopoDS_Face, TopoDS_Shape
 from OCC.Extend.TopologyUtils import TopologyExplorer
 from scipy.spatial import ConvexHull  # pylint: disable=no-name-in-module
 
-from converter import geom_utils
 from OCCUtils.Common import GpropsFromShape
 from OCCUtils.Construct import compound, make_plane
 from OCCUtils.face import Face
+
+from converter import geom_utils
 
 
 def flat_face_info(faces: List[TopoDS_Face]):
@@ -194,7 +195,7 @@ def classify_minor_faces(area: np.ndarray,
     # 세 기준 모두 일치하는 face를 opening face로 판단
     is_opening_face = np.all([is_parallel, is_coplanar, is_same_area], axis=0)
     is_opening_face = np.any(is_opening_face, axis=1)
-    opening_face_idx = np.argwhere(is_opening_face).flatten()
+    opening_face_idx = np.argwhere(is_opening_face).flatten()  # type: ignore
 
   # buffer를 split하지 않는 (=생략되는) face
   minor_faces = set()
@@ -305,7 +306,7 @@ def merge_inner_volume(
       flag_simplify = False
 
   if flag_simplify:
-    for solid_ in [shape] + solids_cut:
+    for solid_ in [shape] + solids_cut:  # type: ignore
       BRepMesh_IncrementalMesh(solid_, brep_deflection[0], False,
                                brep_deflection[1], True)
 
@@ -330,8 +331,10 @@ def merge_inner_volume(
         [np.sum([p.shape[0] for p in vertices]) for vertices in pnts_cut_list])
 
     # 원본 공간의 face vertices
-    pnts_original = [get_vertices(f) for f in TopologyExplorer(shape).faces()]
-    pnts_original = np.vstack(list(chain.from_iterable(pnts_original)))
+    pnts_original = np.vstack(
+        list(
+            chain.from_iterable(
+                (get_vertices(f) for f in TopologyExplorer(shape).faces()))))
 
     # 내외부 점 / 부피 판단 (Convex Hull)
     hull = ConvexHull(np.vstack([pnts_cut, pnts_original]))
@@ -369,7 +372,7 @@ def merge_inner_volume(
       solids = [
           inner_solids[x] for x in range(len(inner_solids)) if merge_mask[x]
       ]
-      solids.append(shape)
+      solids.append(shape)  # type: ignore
       simplified_shape = geom_utils.fuse_compound(solids)
       BRepMesh_IncrementalMesh(simplified_shape, brep_deflection[0], False,
                                brep_deflection[1], True)

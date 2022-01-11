@@ -371,8 +371,7 @@ class OpenFoamCase(ButterflyCase):
     # mesh.sh
     mesh_path = proj_dir.joinpath('mesh.sh')
     with mesh_path.open('wb') as f:
-      # TODO mypy error: test
-      f.write(_MESH_SH)
+      f.write(_MESH_SH)  # type: ignore
 
     # decomposeParDict, run.sh
     if num_of_subdomains and num_of_subdomains > 1:
@@ -388,11 +387,11 @@ class OpenFoamCase(ButterflyCase):
 
     run_path = proj_dir.joinpath('run.sh')
     with run_path.open('wb') as f:
-      f.write(run_sh)
+      f.write(run_sh)  # type: ignore
 
     # simulate
     with proj_dir.joinpath('simulate').open('wb') as f:
-      f.write(b'./mesh.sh\n./run.sh')
+      f.write(b'./mesh.sh\n./run.sh')  # type: ignore
 
   def change_boundary_field(self, variable, boundary_field: BoundaryFieldDict):
     foam_file = None

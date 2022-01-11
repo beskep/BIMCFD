@@ -16,8 +16,8 @@ def config():
 
 def activate_inspector():
   # pylint: disable=import-outside-toplevel
-  from kivy.modules import Modules
   from kivy.core.window import Window
+  from kivy.modules import Modules
 
   Config.set('modules', 'inspector', '')
   Modules.activate_module('inspector', Window)

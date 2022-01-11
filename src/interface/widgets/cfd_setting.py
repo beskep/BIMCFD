@@ -1,11 +1,12 @@
 from kivy.lang.builder import Builder
 from kivy.metrics import dp
 
-from interface.widgets.text_field import TextFieldUnit
 from kivymd.uix.boxlayout import MDBoxLayout
 from kivymd.uix.button import MDFlatButton, MDRaisedButton
 from kivymd.uix.dialog import MDDialog
 from kivymd.uix.selectioncontrol import MDCheckbox
+
+from interface.widgets.text_field import TextFieldUnit
 
 
 class SpacingBox(MDBoxLayout):

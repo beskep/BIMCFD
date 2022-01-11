@@ -26,12 +26,7 @@ def _itc(geom_info: dict):
 
 
 def _fmt(value, fmt='.2f'):
-  if not value:
-    res = 'NA'
-  else:
-    res = '{:{}}'.format(value, fmt)
-
-  return res
+  return '{:{}}'.format(value, fmt) if value else 'NA'
 
 
 class IfcEntityText:

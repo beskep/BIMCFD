@@ -15,10 +15,12 @@ sections = [
     'STDLIB',
     'UTIL',
     'THIRDPARTY',
+    'LOCALTHIRD',
     'FIRSTPARTY',
     'LOCALFOLDER',
 ]
 known_util = ['utils']
+known_localthird = ['butterfly', 'Extend', 'fluids', 'ht', 'kivymd', 'OCCUtils']
 skip_glob = [
     '**/butterfly/*',
     '**/Extend/*',

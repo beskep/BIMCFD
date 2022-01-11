@@ -5,7 +5,7 @@ from collections import defaultdict
 from itertools import chain
 from pathlib import Path
 from tempfile import TemporaryDirectory
-from typing import Collection, Iterable, Optional, Union
+from typing import Collection, Optional, Union
 
 import utils
 
@@ -17,10 +17,11 @@ from OCC.Core.TopoDS import TopoDS_Compound, TopoDS_Shape
 from OCC.Extend.DataExchange import write_stl_file
 from OCC.Extend.TopologyUtils import TopologyExplorer
 
-from converter.geom_utils import get_boundingbox, shapes_distance
-from converter.simplify import face_info
 from OCCUtils.Common import GpropsFromShape
 from OCCUtils.Construct import compound
+
+from converter.geom_utils import get_boundingbox, shapes_distance
+from converter.simplify import face_info
 
 BLENDER_FOUNDATION_PATH = Path(r'C:\Program Files\Blender Foundation')
 
@@ -58,8 +59,8 @@ def stl_to_obj(obj_path, blender_path: Union[None, str, Path], *args):
   stl_path = [os.path.abspath(x) for x in args]
 
   blender = find_blender_path(blender_path)
-  logger.info('blender path: "{}"', blender)
-  if blender_path is None or not blender.exists():
+  logger.debug('blender path: "{}"', blender)
+  if blender is None or not blender.exists():
     raise FileNotFoundError('blender의 경로를 찾을 수 없습니다.')
 
   run_args = [
@@ -421,7 +422,7 @@ def write_obj(compound: TopoDS_Compound,
               walls: Optional[Collection[TopoDS_Shape]],
               obj_path: str,
               deflection: float,
-              wall_names: Optional[list]=None,
+              wall_names: Optional[list] = None,
               additional_faces: dict = None,
               blender_path: Optional[Union[str, Path]] = None,
               extract_interior=True,

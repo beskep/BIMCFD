@@ -1,8 +1,8 @@
-import os
 from collections import OrderedDict, defaultdict
 from collections.abc import Collection
 from itertools import chain
-from typing import List, Tuple, Union
+from pathlib import Path
+from typing import List, Optional, Tuple, Union, no_type_check
 
 import numpy as np
 from OCC.Core.Bnd import Bnd_Box
@@ -154,17 +154,26 @@ def _is_in(solid, pnt: gp_Pnt, tol=0.001, on=True) -> bool:
   """
   pnt가 solid 내부에 있는지 여부를 반환
 
-  :param solid: TopoDS_Shape
-  :param pnt: gp_Pnt
-  :return: bool
+  Parameters
+  ----------
+  solid : TopoDS_Shape
+  pnt : gp_Pnt
+  tol : float, optional
+      tolerance
+  on : bool, optional
+      표면에 존재하는 경우도 `True`로 판단할지 여부
+
+  Returns
+  -------
+  bool
   """
   classifier = BRepClass3d_SolidClassifier(solid)
   classifier.Perform(pnt, tol)
-  result = classifier.State()
-  result = result in [TopAbs_IN, TopAbs_ON] if on else result == TopAbs_IN
+  state = classifier.State()
+  flag = state in [TopAbs_IN, TopAbs_ON] if on else state == TopAbs_IN
   classifier.Destroy()
 
-  return result
+  return flag
 
 
 def calc_split_vol_ratio(split_original: TopoDS_Compound,
@@ -172,11 +181,19 @@ def calc_split_vol_ratio(split_original: TopoDS_Compound,
   """
   major plane으로 나눈 원본 shape과 buffer의 부피 비율 계산
 
-  :param split_original: major plane으로 나눈 원본 shape
-  :param split_buffer: major plane으로 나눈 buffer
-  :return: 표면 단순화 결과에 포함 여부를 결정하는 부피 비율
+  Parameters
+  ----------
+  split_original : TopoDS_Compound
+      major plane으로 나눈 원본 shape
+  split_buffer : TopoDS_Compound
+      major plane으로 나눈 buffer
+
+  Returns
+  -------
+  np.ndarray
+      표면 단순화 결과에 포함 여부를 결정하는 부피 비율
   """
-  # todo: 오류 발생 시 solids_original에서 평면 (mass가 음수)을 제거하게 수정
+  # 오류 발생 시 solids_original에서 평면 (mass가 음수)을 제거하게 수정
   solids_original = list(TopologyExplorer(split_original).solids())
   solids_buffer = list(TopologyExplorer(split_buffer).solids())
 
@@ -194,16 +211,19 @@ def calc_split_vol_ratio(split_original: TopoDS_Compound,
   center_original = np.array(
       [[p.X(), p.Y(), p.Z()] for p in center_original_gppnt])
 
-  center_buffer = [p.CentreOfMass() for p in props_buffer]
-  center_buffer = np.array([[p.X(), p.Y(), p.Z()] for p in center_buffer])
+  center_buffer = np.array(
+      [[p.X(), p.Y(), p.Z()] for p in [p.CentreOfMass() for p in props_buffer]])
 
-  center_buffer_ = np.repeat(center_buffer, center_original.shape[0], axis=0)
-  center_buffer_ = center_buffer_.reshape(
-      [center_buffer.shape[0], center_original.shape[0], 3])
+  center_buffer_ = np.repeat(
+      center_buffer,
+      center_original.shape[0],
+      axis=0,
+  ).reshape([center_buffer.shape[0], center_original.shape[0], 3])
 
-  center_original_ = np.tile(center_original, (center_buffer.shape[0], 1))
-  center_original_ = center_original_.reshape(
-      [center_buffer.shape[0], center_original.shape[0], 3])
+  center_original_ = np.tile(
+      center_original,
+      (center_buffer.shape[0], 1),
+  ).reshape([center_buffer.shape[0], center_original.shape[0], 3])
 
   # 각 buffer의 solid에 대한 original의 solid의 거리
   # todo: 거리 말고 다른 판단방법으로 바꾸기
@@ -246,10 +266,15 @@ def get_face_vertices(face: TopoDS_Face) -> List[List[gp_Pnt]]:
   """
   대상 face의 mesh face별 vertic 좌표를 반환
 
-  :param face: 대상 face
-  :return: 세 개의 gp_pnts로 표현된 각 mesh face의 vertex 좌표
-  """
+  Parameters
+  ----------
+  face : TopoDS_Face
 
+  Returns
+  -------
+  List[List[gp_Pnt]]
+      세 개의 gp_pnts로 표현된 각 mesh face의 vertex 좌표
+  """
   trsf: gp_Trsf = face.Location().Transformation()
 
   loc = TopLoc_Location()
@@ -274,25 +299,37 @@ def get_face_vertices(face: TopoDS_Face) -> List[List[gp_Pnt]]:
   return pnts
 
 
-def get_faces_vertices(faces: list) -> List[List[gp_Pnt]]:
+def get_faces_vertices(faces: List[TopoDS_Face]) -> List[List[gp_Pnt]]:
   """
   곡면 face 목록을 받아서 triangulation 실행 후 각 점의 좌표 반환
 
-  :param faces:
-  :return: list[[gp_pnt, gp_pnt, gp_pnt]
+  Parameters
+  ----------
+  faces : List[TopoDS_Face]
+
+  Returns
+  -------
+  List[List[gp_Pnt]]
   """
-  vertices = [get_face_vertices(face) for face in faces]
-  vertices = list(chain.from_iterable(vertices))
+  vertices = list(
+      chain.from_iterable([get_face_vertices(face) for face in faces]))
 
   return vertices
 
 
+@no_type_check
 def planes_from_faces(faces: List[TopoDS_Shape]) -> List[Geom_Plane]:
   """
   각 face를 포함하는 plane 반환
 
-  :param faces: 대상 face 리스트
-  :return: List[Geom_Plane]
+  Parameters
+  ----------
+  faces : List[TopoDS_Shape]
+      faces
+
+  Returns
+  -------
+  List[Geom_Plane]
   """
   surfaces = [BRep_Tool_Surface(face) for face in faces]
   planes = [Geom_Plane.DownCast(surface) for surface in surfaces]
@@ -328,18 +365,26 @@ def split_by_faces(shape: TopoDS_Shape,
                    faces: List[TopoDS_Face],
                    parallel=False,
                    step=False,
-                   verbose=False):
+                   verbose=False) -> TopoDS_Compound:
   """
-  shape을 각 faces로 나눈 결과를 반환
+  shape을 각 face로 나눔
 
-  :param shape: 분할 대상 shape
-  :param faces: shape을 분할할 face의 List
-  :param parallel: GEOMAlgo_Splitter의 SetParallelMode 여부
-  :param step: True일 경우 각 face를 통해 순차적으로 slit 시행.
-  False일 경우 한번에 split.
-  :param verbose:
+  Parameters
+  ----------
+  shape : TopoDS_Shape
+      shape
+  faces : List[TopoDS_Face]
+      faces
+  parallel : bool, optional
+      GEOMAlgo_Splitter의 SetParallelMode 여부
+  step : bool, optional
+      True일 경우 각 face를 통해 순차적으로 slit 시행
+  verbose : bool, optional
+      verbose
 
-  :return: TopoDS_Compound
+  Returns
+  -------
+  TopoDS_Compound
   """
   # splitter = GEOMAlgo_Splitter()
   splitter = BOPAlgo_Splitter()
@@ -367,16 +412,22 @@ def split_by_faces(shape: TopoDS_Shape,
 
     result = shape
 
-  return result
+  return result  # type: ignore
 
 
 def sew_faces(shape: TopoDS_Shape, tol=1e-3) -> TopoDS_Solid:
   """
   shape의 모든 face로 형성되는 solid 반환
 
-  :param shape: 대상 shape
-  :param tol: BRepBuilderAPI_Sewing의 허용 오차
-  :return: TopoDS_Solid
+  Parameters
+  ----------
+  shape : TopoDS_Shape
+  tol : [type], optional
+      BRepBuilderAPI_Sewing의 허용 오차
+
+  Returns
+  -------
+  TopoDS_Solid
   """
   sew = BRepBuilderAPI_Sewing(tol)
 
@@ -384,7 +435,7 @@ def sew_faces(shape: TopoDS_Shape, tol=1e-3) -> TopoDS_Solid:
     sew.Add(face)
 
   sew.Perform()
-  solid = BRepBuilderAPI_MakeSolid(sew.SewedShape()).Solid()
+  solid = BRepBuilderAPI_MakeSolid(sew.SewedShape()).Solid()  # type: ignore
 
   return solid
 
@@ -520,7 +571,7 @@ def compare_shapes(original: TopoDS_Shape, simplified: TopoDS_Shape):
   return compare
 
 
-def align_model(shape: TopoDS_Shape) -> TopoDS_Shape:
+def align_model(shape: TopoDS_Shape) -> Optional[TopoDS_Shape]:
   """건물 모델의 주요 표면이 xyz 평면과 수평하도록 회전,
   원점 근처에 위치하도록 평행이동
 
@@ -531,7 +582,7 @@ def align_model(shape: TopoDS_Shape) -> TopoDS_Shape:
 
   Returns
   -------
-  TopoDS_Shape
+  Optional[TopoDS_Shape]
       aligned shape
   """
   if not isinstance(shape, TopoDS_Shape):
@@ -568,7 +619,7 @@ def align_model(shape: TopoDS_Shape) -> TopoDS_Shape:
   return None
 
 
-def write_each_shapes(shape: TopoDS_Compound, save_dir, mkdir=False):
+def write_each_shapes(shape: TopoDS_Compound, save_dir: Path, mkdir=False):
   """compound를 구성하는 각 shape을 저장
 
   Parameters
@@ -577,17 +628,22 @@ def write_each_shapes(shape: TopoDS_Compound, save_dir, mkdir=False):
       대상 compound
   save_dir : PathLike
       저장 위치
+  mkdir : bool
+      make dir if `save_dir` not exist
   """
   exp = TopologyExplorer(shape)
   if exp.number_of_solids() <= 1:
     raise ValueError('대상 shape에 solid가 없음')
 
-  if not os.path.exists(save_dir) and mkdir:
-    os.mkdir(save_dir)
+  if not save_dir.exists():
+    if mkdir:
+      save_dir.mkdir()
+    else:
+      raise FileNotFoundError(save_dir)
 
   solids = exp.solids()
   for idx, solid in enumerate(solids):
-    path = os.path.join(save_dir, '{}.stl'.format(idx))
+    path = save_dir.joinpath(f'{idx}.stl').as_posix()
     DataExchange.write_stl_file(a_shape=solid, filename=path)
 
 
