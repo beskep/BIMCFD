@@ -1,5 +1,4 @@
 # -*- mode: python ; coding: utf-8 -*-
-import os
 import sys
 from pathlib import Path
 
@@ -9,7 +8,7 @@ from PyInstaller import compat
 
 sys.setrecursionlimit(5000)
 
-SRC_DIR = os.path.normpath(os.path.abspath('./src'))
+SRC_DIR = Path(__file__).parent.joinpath('src').as_posix()
 if SRC_DIR not in sys.path:
   sys.path.insert(0, SRC_DIR)
 

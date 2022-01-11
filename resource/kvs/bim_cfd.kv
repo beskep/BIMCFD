@@ -2,7 +2,7 @@
 
 <MDRaisedButton>:
     pos_hint: {'center_y': 0.5}
-    # text_color: 0, 0, 0, 0.9
+    font_size: 15
 <MDLabel>:
     pos_hint: {'center_y': 0.5}
 <MDTextField>:
@@ -42,12 +42,12 @@
             SimplificationPanel:
                 id: simplification_panel
 
-            MaterialPanel:
-                id: material_panel
-                size_hint_y: 0.6
+            WindPanel:
+                id: wind_panel
 
             OutputPanel:
                 id: output_panel
+                size_hint_y: 1.1
 
             MDStackLayout:
                 orientation: 'rl-tb'
@@ -56,13 +56,15 @@
 
                 MDRaisedButton:
                     text: 'CFD 환경변수 변환'
-                    font_size: 16
                     on_release: app.execute()
 
                 MDRaisedButton:
                     text: '전처리'
-                    font_size: 16
                     on_release: app.simplify_space()
+
+                MDRaisedButton:
+                    text: '물성 DB'
+                    on_release: app.open_material_db()
 
         ViewPanel:
             id: view_panel

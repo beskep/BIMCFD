@@ -483,21 +483,3 @@ class BimCfdAppBase(MDApp):
       self._simpl_dialog.width = 450
 
     self._simpl_dialog.open()
-
-  def open_material_dialog(self):
-    if self._material_dialog is None:
-      buttons = [
-          # MDRaisedButton(text='추가'),
-          # MDRaisedButton(text='삭제'),
-          MDRaisedButton(text='확인')
-      ]
-
-      self._material_dialog = MDDialog(
-          title='물성정보 데이터베이스',
-          type='simple',
-          items=[_material_list_item(x) for x in _MATERIALS],
-          buttons=buttons)
-      buttons[-1].on_release = self._material_dialog.dismiss
-      self._material_dialog.height = 500
-
-    self._material_dialog.open()

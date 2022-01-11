@@ -1,0 +1,40 @@
+#:kivy 1.11
+
+<WindPanel@MDBoxLayout>:
+    BIMCFDPanel:
+        MDGridLayout:
+            cols: 1
+            padding: dp(10)
+
+            PanelTitle:
+                icon: 'weather-windy'
+                text: 'CFD 설정'
+            MDSeparator:
+                height: dp(1)
+                size_hint_y: None
+
+            MDBoxLayout:
+                orientation: 'vertical'
+                spacing: dp(5)
+
+                MDBoxLayout:
+                    orientation: 'horizontal'
+
+                    MDLabel:
+                        text: '풍환경 해석 (외부 영역 생성)'
+
+                    MDCheckbox:
+                        id: flag_external
+                        size_hint_x: None
+                        active: False
+
+                MDBoxLayout:
+                    orientation: 'horizontal'
+
+                    MDLabel:
+                        text: 'CFD 세부 옵션'
+
+                    MDRaisedButton:
+                        id: _button
+                        text: '설정'
+                        # on_release: app. # TODO

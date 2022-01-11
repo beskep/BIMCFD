@@ -13,6 +13,7 @@ class TextFieldFont(MDTextField):
     self.has_had_text = False
     self.error = False
     self.helper_text = ''
+    self.hint_text = ''
     super().__init__(**kwargs)
 
   def on_font_name(self, instance, value):

@@ -1,3 +1,4 @@
+import os
 import re
 from pathlib import Path
 
@@ -9,6 +10,7 @@ from loguru import logger
 
 from converter import ifc_converter as ifccnv
 from converter import openfoam
+from converter.material_match import DB_PATH as MATERIAL_DB_PATH
 from interface import kvtools
 from interface.bim_cfd_base import BimCfdAppBase, with_spinner
 from interface.widgets import topo_widget as topo
@@ -347,6 +349,10 @@ class BimCfdApp(BimCfdAppBase):
 
     self._execute_helper(simplified=self._simplified, save_dir=save_dir)
 
+  @staticmethod
+  def open_material_db():
+    os.startfile(MATERIAL_DB_PATH)
+
 
 def main():
   font_regular = utils.DIR.RESOURCE.joinpath('NotoSansCJKkr-Medium.otf')
@@ -362,7 +368,7 @@ def main():
   kvs = [
       'bim_cfd',
       'file_panel',
-      'material_panel',
+      'cfd_panel',
       'output_panel',
       'simplification_panel',
       'view_panel',
