@@ -1,6 +1,7 @@
 import os
 from collections import OrderedDict, defaultdict
 from itertools import chain, combinations
+from pathlib import Path
 from shutil import copy2
 from typing import Iterable, List, Optional, Tuple, Union
 
@@ -524,25 +525,21 @@ class IfcConverter:
                                    opening_names=None,
                                    inlet_names=None,
                                    outlet_names=None,
-                                   target_fields: list = None,
-                                   drop_fields: list = None):
+                                   target_fields: Optional[list] = None,
+                                   drop_fields: Optional[list] = None):
     """수동 생성 안한 나머지 field 설정"""
-    if opening_names is None:
-      opening_names = []
-    if inlet_names is None:
-      inlet_names = []
-    if outlet_names is None:
-      outlet_names = []
+    opening_names = opening_names or []
+    inlet_names = inlet_names or []
+    outlet_names = outlet_names or []
 
     ffs = [x for x in case.foam_files if x.location == '"0"']
 
     if target_fields:
-      bf_names = [x.name for x in ffs]
-      invalid_fields = [x for x in target_fields if x not in bf_names]
-
+      invalid_fields = [
+          x for x in target_fields if x not in [x.name for x in ffs]
+      ]
       if invalid_fields:
-        raise ValueError('Invalid target boundary fields: {}'.format(
-            str(invalid_fields)))
+        raise ValueError(f'Invalid target boundary fields: {invalid_fields}')
 
       ffs = [x for x in ffs if x.name in target_fields]
 
@@ -556,28 +553,20 @@ class IfcConverter:
     for ff in ffs:
       bf_template = ff.values['boundaryField']
       opening_field = bf_template['opening']
-      wall_field = bf_template['wall']
-
-      inlet_field = bf_template.get('inlet', opening_field)
-      outlet_field = bf_template.get('outlet', opening_field)
+      fields = (
+          bf_template['opening'],
+          bf_template.get('inlet', opening_field),
+          bf_template.get('outlet', opening_field),
+          bf_template['wall'],
+      )
 
       bf = BoundaryFieldDict()
 
-      for opening in opening_names:
-        bf[opening] = opening_field
-        bf.add_empty_line()
-
-      for inlet in inlet_names:
-        bf[inlet] = inlet_field
-        bf.add_empty_line()
-
-      for outlet in outlet_names:
-        bf[outlet] = outlet_field
-        bf.add_empty_line()
-
-      for wall in wall_names:
-        bf[wall] = wall_field
-        bf.add_empty_line()
+      for names, field in zip(
+          [opening_names, inlet_names, outlet_names, wall_names], fields):
+        for surface in names:
+          bf[surface] = field
+          bf.add_empty_line()
 
       case.change_boundary_field(variable=ff.name, boundary_field=bf)
 
@@ -726,12 +715,9 @@ class IfcConverter:
     if not preserve_opening:
       openings = None
 
-    if threshold_volume is None:
-      threshold_volume = self.threshold_internal_volume
-    if threshold_dist is None:
-      threshold_dist = self.threshold_surface_dist
-    if threshold_angle is None:
-      threshold_angle = self.threshold_surface_angle
+    threshold_volume = threshold_volume or self.threshold_internal_volume
+    threshold_dist = threshold_dist or self.threshold_surface_dist
+    threshold_angle = threshold_angle or self.threshold_surface_angle
 
     if not any([threshold_volume, threshold_dist, threshold_angle]):
       logger.info('단순화 조건이 설정되지 않았습니다. 원본 형상을 저장합니다.')
@@ -771,18 +757,16 @@ class IfcConverter:
         'is_simplified': is_simplified
     }
 
-    info_original_geom = geom_utils.geometric_features(shape)
     info = {
         'simplification': info_simplification,
-        'original_geometry': info_original_geom
+        'original_geometry': geom_utils.geometric_features(shape)
     }
-    info_keys = ['simplified_geometry', 'fused_geometry']
     if is_simplified:
-      for key, geom in zip(info_keys, [simplified, fused]):
-        info[key] = geom_utils.geometric_features(geom)
+      info['simplified_geometry'] = geom_utils.geometric_features(simplified)
+      info['fused_geometry'] = geom_utils.geometric_features(fused)
     else:
-      for key in info_keys:
-        info[key] = info['original_geometry']
+      info['simplified_geometry'] = info['original_geometry']
+      info['fused_geometry'] = info['original_geometry']
 
     objcnv = ObjConverter(compound=(simplified if is_simplified else shape),
                           space=space,
@@ -877,72 +861,37 @@ class IfcConverter:
     except RuntimeError as e:
       logger.error('obj 저장 실패: {}', e)
 
-  def openfoam_case(self,
-                    simplified,
-                    save_dir,
-                    case_name,
-                    openfoam_options: dict = None):
-    """OpenFOAM 케이스 생성 및 저장
+  def _openfoam_option(self, options: Optional[dict]):
+    options = options or self.openfoam_options.copy()
 
-    Parameters
-    ----------
-    simplified : dict
-        simplification 결과
-    save_dir : PathLike
-        저장 경로
-    case_name : str
-        저장할 케이스 이름 (save_dir/case_name에 결과 저장)
-    openfoam_options : dict, optional
-        options, by default None
-
-    Raises
-    ------
-    ValueError
-        OpenFOAM 설정 입력 오류
-    """
-    if openfoam_options is None:
-      opt = self.openfoam_options.copy()
-    else:
-      opt = openfoam_options
-
-    missing = [x for x in self.default_openfoam_options if x not in opt]
+    missing = [x for x in self.default_openfoam_options if x not in options]
     if missing:
       logger.info('다음 옵션에 기본값 적용: {}', missing)
-    for key in missing:
-      opt[key] = self.default_openfoam_options[key]
 
-    unused = [x for x in opt if x not in self.default_openfoam_options]
+    for key in missing:
+      options[key] = self.default_openfoam_options[key]
+
+    unused = [x for x in options if x not in self.default_openfoam_options]
     if unused:
       logger.warning('적용되지 않는 OpenFOAM 옵션들: {}', unused)
 
-    solver = opt['solver']
-    if not OpenFoamCase.is_supported_solver(solver):
-      raise ValueError('지원하지 않는 solver입니다: {}'.format(solver))
+    return options
 
-    working_dir = os.path.normpath(os.path.join(save_dir, case_name))
-    if not os.path.exists(working_dir):
-      os.mkdir(working_dir)
-
-    is_simplified = simplified['info']['simplification']['is_simplified']
-
-    flag_external_zone = (opt['flag_external_zone'] and
-                          opt['external_zone_size'] > 1)
+  def _write_openfoam_object(self, options, simplified, working_dir: Path):
+    flag_external_zone = (options['flag_external_zone'] and
+                          options['external_zone_size'] > 1)
     if flag_external_zone:
-      if is_simplified:
-        shape = simplified['simplified']
-      else:
-        shape = simplified['original']
+      shape = simplified['simplified'] or simplified['original']
 
       _, zone_faces = geom_utils.make_external_zone(
-          shape, buffer_size=opt['external_zone_size'])
-
+          shape, buffer_size=options['external_zone_size'])
+      obj_path = working_dir.joinpath('geometry/geometry_external.obj')
       write_obj(compound=shape,
                 space=simplified['space'],
                 openings=simplified['openings'],
                 walls=[self.create_geometry(x) for x in simplified['walls']],
                 wall_names=simplified['wall_names'],
-                obj_path=os.path.join(working_dir, 'geometry',
-                                      'geometry_external.obj'),
+                obj_path=obj_path.as_posix(),
                 deflection=self.brep_deflection,
                 additional_faces=zone_faces,
                 extract_interior=False,
@@ -951,7 +900,7 @@ class IfcConverter:
     # geometry 폴더에 저장된 obj 파일을 OpenFOAM 케이스 폴더 가장 바깥에 복사
     if flag_external_zone:
       geom_file = 'geometry_external.obj'
-    elif opt['flag_interior_faces']:
+    elif options['flag_interior_faces']:
       geom_file = 'geometry_interior.obj'
     else:
       geom_file = 'geometry.obj'
@@ -963,65 +912,106 @@ class IfcConverter:
     else:
       logger.warning('obj 추출에 실패했습니다.')
 
-    # OpenFOAM 케이스 파일 생성
-    open_foam_case = OpenFoamCase.from_template(solver=solver,
-                                                save_dir=save_dir,
-                                                name=case_name)
-
+  def _write_openfoam_case(self, simplified: dict, case: OpenFoamCase,
+                           options: dict):
+    solver = options['solver']
     wall_names = ['Surface_' + x for x in simplified['wall_names']]
     opening_names = simplified['opening_names']
 
     drop_fields = []
-    if OpenFoamCase.is_energy_available(solver) and opt['flag_energy']:
-      heat_transfer_coefficient = opt.get('heat_transfer_coefficient', '1e8')
-      if heat_transfer_coefficient is None:
-        heat_transfer_coefficient = '1e8'
+    if OpenFoamCase.is_energy_available(solver) and options['flag_energy']:
+      htc = options.get('heat_transfer_coefficient', '1e8') or '1e8'
+
       bf_t = self.openfoam_temperature_dict(
           solver=solver,
           surface=simplified['walls'],
           surface_name=wall_names,
           opening_names=opening_names,
           min_score=self.minimum_match_score,
-          temperature=opt.get('external_temperature', 300),
-          heat_flux=opt.get('flag_heat_flux', True),
-          heat_transfer_coefficient=heat_transfer_coefficient)
-      open_foam_case.change_boundary_field(variable='T', boundary_field=bf_t)
+          temperature=options.get('external_temperature', 300),
+          heat_flux=options.get('flag_heat_flux', True),
+          heat_transfer_coefficient=htc)
+      case.change_boundary_field(variable='T', boundary_field=bf_t)
       drop_fields.append('T')
 
-    if OpenFoamCase.is_turbulence_available(solver) and opt['flag_friction']:
+    if (OpenFoamCase.is_turbulence_available(solver) and
+        options['flag_friction']):
       bf_nut = self.openfoam_rough_wall_nut_dict(
           solver=solver,
           surface=simplified['walls'],
           surface_name=wall_names,
           opening_names=opening_names,
           min_score=self.minimum_match_score)
-      open_foam_case.change_boundary_field(variable='nut',
-                                           boundary_field=bf_nut)
+      case.change_boundary_field(variable='nut', boundary_field=bf_nut)
       drop_fields.append('nut')
 
-    self.openfoam_zero_boundary_field(case=open_foam_case,
+    self.openfoam_zero_boundary_field(case=case,
                                       wall_names=wall_names,
                                       opening_names=opening_names,
                                       drop_fields=drop_fields)
 
-    if opt.get('max_cell_size', None):
-      max_cell_size = opt['max_cell_size']
+    if options.get('max_cell_size', None):
+      max_cell_size = options['max_cell_size']
     else:
-      geom_info = simplified['info'][('fused_geometry' if is_simplified else
-                                      'original_geometry')]
-      max_cell_size = geom_info['characteristic_length'] / opt['grid_resolution']
+      try:
+        cl = simplified['info']['fused_geometry']['characteristic_length']
+      except KeyError:
+        cl = simplified['info']['original_geometry']['characteristic_length']
+
+      max_cell_size = cl / options['grid_resolution']
       # todo: max cell size 배율 수정?
 
     mesh_dict = self.openfoam_cf_mesh_dict(
         max_cell_size=max_cell_size,
-        min_cell_size=opt.get('min_cell_size', None),
-        boundary_cell_size=opt.get('boundary_cell_size', None),
-        boundary_layers_args=opt.get('boundary_layers', None))
-    open_foam_case.change_foam_file_value('meshDict', mesh_dict)
+        min_cell_size=options.get('min_cell_size', None),
+        boundary_cell_size=options.get('boundary_cell_size', None),
+        boundary_layers_args=options.get('boundary_layers', None))
+    case.change_foam_file_value('meshDict', mesh_dict)
 
-    open_foam_case.save(overwrite=False, minimum=False)
-    open_foam_case.save_shell(solver=solver,
-                              num_of_subdomains=opt['num_of_subdomains'])
+    case.save(overwrite=False, minimum=False)
+    case.save_shell(solver=solver,
+                    num_of_subdomains=options['num_of_subdomains'])
+
+  def openfoam_case(self,
+                    simplified,
+                    save_dir,
+                    case_name,
+                    openfoam_options: Optional[dict] = None):
+    """OpenFOAM 케이스 생성 및 저장
+
+    Parameters
+    ----------
+    simplified : dict
+        simplification 결과
+    save_dir : PathLike
+        저장 경로
+    case_name : str
+        저장할 케이스 이름 (save_dir/case_name에 결과 저장)
+    openfoam_options : Optional[dict], optional
+        options, by default None
+
+    Raises
+    ------
+    ValueError
+        OpenFOAM 설정 입력 오류
+    """
+    options = self._openfoam_option(openfoam_options)
+    if not OpenFoamCase.is_supported_solver(options['solver']):
+      raise ValueError('지원하지 않는 solver입니다: {}'.format(options['solver']))
+
+    save_dir = Path(save_dir)
+    save_dir.stat()
+    working_dir = save_dir.joinpath(case_name)
+    working_dir.mkdir(exist_ok=True)
+
+    self._write_openfoam_object(options=options,
+                                simplified=simplified,
+                                working_dir=working_dir)
+
+    case = OpenFoamCase.from_template(solver=options['solver'],
+                                      save_dir=save_dir,
+                                      name=case_name)
+    self._write_openfoam_case(simplified=simplified, case=case, options=options)
 
   def component_code(self, entities, prefix, storey_prefix='F'):
     if self._storeys is None:
@@ -1034,11 +1024,7 @@ class IfcConverter:
     storeys_len = len(str(len(self._storeys)))
 
     def storey_id(x):
-      if x is None:
-        res = 0
-      else:
-        res = x.GlobalId
-      return res
+      return 0 if x is None else x.GlobalId
 
     entity_index = {storey_id(x): 1 for x in storeys}
     entity_len = {
@@ -1090,10 +1076,9 @@ def get_bounded_by(space: IfcEntity):
 
 
 def entity_name(entity: IfcEntity) -> str:
-  if hasattr(entity, 'LongName') and entity.LongName is not None:
-    res = '{} ({})'.format(entity.Name, entity.LongName)
+  if hasattr(entity, 'LongName') and entity.LongName:
+    name = f'{entity.Name} ({entity.LongName})'
   else:
-    res = entity.Name
-    assert isinstance(res, str)
+    name = str(entity.Name)
 
-  return res
+  return name

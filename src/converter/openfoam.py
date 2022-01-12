@@ -212,8 +212,6 @@ class OpenFoamCase(ButterflyCase):
                   name: Optional[str] = None,
                   convert_from_meters=1):
     """
-    [summary]
-
     Parameters
     ----------
     path : StrPath
@@ -232,9 +230,9 @@ class OpenFoamCase(ButterflyCase):
     OpenFoamCase
     """
     # collect foam files
-    __originalName = Path(path).stem
+    original_name = Path(path).stem
     if not name:
-      name = __originalName
+      name = original_name
 
     _files = load_case_files(path)
 
@@ -275,7 +273,7 @@ class OpenFoamCase(ButterflyCase):
     # original name is a variable to address the current limitation to change
     # the name of stl file in snappyHexMeshDict. It will be removed once the
     # limitation is addressed.
-    _case.__originalName = __originalName
+    _case.__originalName = original_name  # pylint: disable=unused-private-member, attribute-defined-outside-init
 
     return _case
 

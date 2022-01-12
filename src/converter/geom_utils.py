@@ -176,6 +176,15 @@ def _is_in(solid, pnt: gp_Pnt, tol=0.001, on=True) -> bool:
   return flag
 
 
+def _solid_center_distance(xyz1: np.ndarray, xyz2: np.ndarray):
+  shape = [xyz1.shape[0], xyz2.shape[0], 3]
+  arr1 = np.repeat(xyz1, xyz2.shape[0], axis=0).reshape(shape)
+  arr2 = np.tile(xyz2, (xyz1.shape[0], 1)).reshape(shape)
+  dist = np.sum(np.square(arr1 - arr2), axis=2)
+
+  return dist
+
+
 def calc_split_vol_ratio(split_original: TopoDS_Compound,
                          split_buffer: TopoDS_Compound) -> np.ndarray:
   """
@@ -214,20 +223,9 @@ def calc_split_vol_ratio(split_original: TopoDS_Compound,
   center_buffer = np.array(
       [[p.X(), p.Y(), p.Z()] for p in [p.CentreOfMass() for p in props_buffer]])
 
-  center_buffer_ = np.repeat(
-      center_buffer,
-      center_original.shape[0],
-      axis=0,
-  ).reshape([center_buffer.shape[0], center_original.shape[0], 3])
-
-  center_original_ = np.tile(
-      center_original,
-      (center_buffer.shape[0], 1),
-  ).reshape([center_buffer.shape[0], center_original.shape[0], 3])
-
   # 각 buffer의 solid에 대한 original의 solid의 거리
   # todo: 거리 말고 다른 판단방법으로 바꾸기
-  dist = np.sum(np.square(center_buffer_ - center_original_), axis=2)
+  dist = _solid_center_distance(center_buffer, center_original)
 
   dist_argsort = np.argsort(dist, axis=1)
   matching_idx = [
@@ -539,13 +537,12 @@ def make_external_zone(shape: TopoDS_Shape,
   center = np.array([[p.X(), p.Y(), p.Z()] for p in gp_center])
 
   arg_sort = np.argsort(center[:, vertical_dim])
-  ground = faces[arg_sort[0]]
-  ceiling = faces[arg_sort[-1]]
-  vertical = [faces[x] for x in arg_sort[1:-1]]
-
-  zone_dict = {'External_' + str(i): f for i, f in enumerate(vertical)}
-  zone_dict['Ground'] = ground
-  zone_dict['Ceiling'] = ceiling
+  zone_dict = {
+      'External_' + str(i): f
+      for i, f in enumerate([faces[x] for x in arg_sort[1:-1]])
+  }
+  zone_dict['Ground'] = faces[arg_sort[0]]
+  zone_dict['Ceiling'] = faces[arg_sort[-1]]
 
   return zone, zone_dict
 
@@ -589,11 +586,10 @@ def align_model(shape: TopoDS_Shape) -> Optional[TopoDS_Shape]:
     raise TypeError('Need TopoDS_Shape, got {}'.format(type(shape)))
 
   faces = list(TopologyExplorer(shape).faces())
-  faces_area = [GpropsFromShape(x).surface().Mass() for x in faces]
-  area_argsort = np.argsort(faces_area)
-  faces_sorted = [faces[x] for x in area_argsort[::-1]]
+  area_argsort = np.argsort(
+      [GpropsFromShape(x).surface().Mass() for x in faces])
 
-  for face in faces_sorted:
+  for face in (faces[x] for x in area_argsort[::-1]):
     plane = planes_from_faces([face])[0]
     if plane is None:
       continue

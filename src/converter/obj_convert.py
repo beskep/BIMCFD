@@ -1,11 +1,10 @@
-import os
 import re
 import subprocess
 from collections import defaultdict
 from itertools import chain
 from pathlib import Path
 from tempfile import TemporaryDirectory
-from typing import Collection, Optional, Union
+from typing import Collection, List, Optional, Union
 
 import utils
 
@@ -13,7 +12,8 @@ import numpy as np
 from loguru import logger
 from OCC.Core.BRepAlgo import BRepAlgo_Common
 from OCC.Core.BRepBuilderAPI import BRepBuilderAPI_MakeVertex
-from OCC.Core.TopoDS import TopoDS_Compound, TopoDS_Shape
+from OCC.Core.gp import gp_Vec
+from OCC.Core.TopoDS import TopoDS_Compound, TopoDS_Face, TopoDS_Shape
 from OCC.Extend.DataExchange import write_stl_file
 from OCC.Extend.TopologyUtils import TopologyExplorer
 
@@ -29,6 +29,21 @@ EMPTY_BLEND_PATH = utils.DIR.RESOURCE.joinpath('empty.blend')
 BLENDER_SCRIPT_PATH = utils.DIR.RESOURCE.joinpath('blender.py')
 EMPTY_BLEND_PATH.stat()
 BLENDER_SCRIPT_PATH.stat()
+
+
+class _FaceInfo:
+
+  def __init__(self, areas: np.ndarray, norms: np.ndarray,
+               center: np.ndarray) -> None:
+    self.areas = areas
+    self.norms = norms
+    self.center = center
+
+
+def _face_info(faces: List[TopoDS_Face]):
+  areas, norms, _, center, _ = face_info(faces)
+
+  return _FaceInfo(areas=areas, norms=norms, center=center)
 
 
 def find_blender_path(path=None):
@@ -55,8 +70,8 @@ def find_blender_path(path=None):
 
 
 def stl_to_obj(obj_path, blender_path: Union[None, str, Path], *args):
-  obj_path = os.path.abspath(obj_path)
-  stl_path = [os.path.abspath(x) for x in args]
+  obj_path = Path(obj_path).resolve().as_posix()
+  stl_path = [Path(x).resolve().as_posix() for x in args]
 
   blender = find_blender_path(blender_path)
   logger.debug('blender path: "{}"', blender)
@@ -85,19 +100,18 @@ def _bbox_ndarray(shape):
   return np.array(get_boundingbox(shape)).reshape([2, 3])
 
 
-def is_same_face(op_faces, op_norm, op_center, srf_norm, srf_center, tol):
-  vec = (op_norm.reshape([-1, 1, 3]) *
-         (op_center.reshape([-1, 1, 3]) - srf_center))
+def is_same_face(faces1, norm1, center1, norm2, center2, tol):
+  vec = (norm1.reshape([-1, 1, 3]) * (center1.reshape([-1, 1, 3]) - center2))
   dot = np.abs(np.sum(vec, axis=2))
   is_coplanar = np.isclose(dot, 0.0, atol=tol)
 
-  op_norm = op_norm / np.linalg.norm(op_norm, axis=1).reshape([-1, 1])
-  srf_norm = srf_norm / np.linalg.norm(srf_norm, axis=1).reshape([-1, 1])
+  norm1 = norm1 / np.linalg.norm(norm1, axis=1).reshape([-1, 1])
+  norm2 = norm2 / np.linalg.norm(norm2, axis=1).reshape([-1, 1])
   is_parallel = np.isclose(
-      np.abs(np.sum(op_norm.reshape([-1, 1, 3]) * srf_norm, axis=2)), 1.0)
+      np.abs(np.sum(norm1.reshape([-1, 1, 3]) * norm2, axis=2)), 1.0)
 
-  bbox = np.array([_bbox_ndarray(face) for face in op_faces])
-  is_in = (bbox.reshape([-1, 2, 1, 3]) - srf_center) >= 0
+  bbox = np.array([_bbox_ndarray(face) for face in faces1])
+  is_in = (bbox.reshape([-1, 2, 1, 3]) - center2) >= 0
   is_in = np.logical_xor(is_in[:, 0], is_in[:, 1])
   is_in = np.sum(is_in, axis=2) == 3
 
@@ -172,105 +186,115 @@ class ObjConverter:
         if len(face_solid[i]) == 1
     ]
 
+  def _classify_opening_surfaces(self, opening_volume, tol):
+    for faces in self._op_faces:
+      if opening_volume:
+        # opening의 부피를 추출
+        if len(faces) != 6:
+          logger.warning('Opening이 직육면체 모양이 아닙니다. 추출에 오류가 발생할 수 있습니다.')
+
+        # 공간과 거리가 떨어져 있는 face (= inlet / outlet) 판단
+        dist = [shapes_distance(face, self._space, tol) for face in faces]
+        opening_face = [f for f, d in zip(faces, dist) if d > tol]
+
+      else:
+        # space와 겹치는 face만을 opening으로 추출
+        common = [BRepAlgo_Common(face, self._space).Shape() for face in faces]
+        area = [GpropsFromShape(x).surface().Mass() for x in common]
+
+        opening_face = [f for f, a in zip(faces, area) if a >= tol]
+
+        if len(opening_face) > 1:
+          opening_face = faces
+
+      self._obj_opening.extend(opening_face)
+
+  def _classify_opening_interior(self, op, surf, surface_closest_opening,
+                                 surface_opening_idx, tol):
+    # interior 중 opening에 해당하는 면 추출
+    intr = _face_info(self._obj_interior)
+    intr_opening_mask = is_same_face(faces1=self._obj_opening,
+                                     norm1=op.norms,
+                                     center1=op.center,
+                                     norm2=intr.norms,
+                                     center2=intr.center,
+                                     tol=tol)
+
+    distsq = np.square(op.center.reshape([-1, 1, 3]) - intr.center)
+    intr_closest_opening = np.argmin(np.sum(distsq, axis=2), axis=0)
+    intr_opening_idx = np.argwhere(np.any(intr_opening_mask, axis=0))
+
+    opening_from_surface = [(surface_closest_opening[i], f)
+                            for i, f in enumerate(self._obj_surface)
+                            if i in surface_opening_idx]
+    opening_from_interior = [(-intr_closest_opening[i], f)
+                             for i, f in enumerate(self._obj_interior)
+                             if i in intr_opening_idx]
+    self._obj_interior = [
+        f for i, f in enumerate(self._obj_interior) if i not in intr_opening_idx
+    ]
+    self._obj_opening = opening_from_surface + opening_from_interior
+
+    # 표면(벽) 중 opening 부피와 일치하는 표면 제거
+    opvol_faces = list(chain.from_iterable(self._op_faces))
+    opvol = _face_info(opvol_faces)
+    surface_opening_vol_mask = is_same_face(faces1=opvol_faces,
+                                            norm1=opvol.norms,
+                                            center1=opvol.center,
+                                            norm2=surf.norms,
+                                            center2=surf.center,
+                                            tol=tol)
+    surface_opening_vol_idx = np.argwhere(
+        np.any(surface_opening_vol_mask, axis=0))
+
+    self._obj_surface = [
+        f for i, f in enumerate(self._obj_surface)
+        if i not in surface_opening_vol_idx
+    ]
+
   def classify_opening(self, tol=1e-4, opening_volume=False):
     if self._obj_interior is None:
       self.classify_compound()
 
     self._obj_opening = list()
-    if self._op_faces:
-      for faces in self._op_faces:
-        if opening_volume:
-          # opening의 부피를 추출
-          if len(faces) != 6:
-            logger.warning('Opening이 직육면체 모양이 아닙니다. 추출에 오류가 발생할 수 있습니다.')
+    if not self._op_faces:
+      return
 
-          # 공간과 거리가 떨어져 있는 face (= inlet / outlet) 판단
-          dist = [shapes_distance(face, self._space, tol) for face in faces]
-          opening_face = [f for f, d in zip(faces, dist) if d > tol]
+    self._classify_opening_surfaces(opening_volume=opening_volume, tol=tol)
+    if not self._obj_opening:
+      return
 
-        else:
-          # space와 겹치는 face만을 opening으로 추출
-          common = [
-              BRepAlgo_Common(face, self._space).Shape() for face in faces
-          ]
-          area = [GpropsFromShape(x).surface().Mass() for x in common]
+    # surface 중 opening face 제거
+    op = _face_info(self._obj_opening)
+    surf = _face_info(self._obj_surface)
 
-          opening_face = [f for f, a in zip(faces, area) if a >= tol]
+    # 표면(벽), 중 opening에 해당하는 면 추출
+    surface_opening_mask = is_same_face(faces1=self._obj_opening,
+                                        norm1=op.norms,
+                                        center1=op.center,
+                                        norm2=surf.norms,
+                                        center2=surf.center,
+                                        tol=tol)
 
-          if len(opening_face) > 1:
-            opening_face = faces
+    distsq = np.square(op.center.reshape([-1, 1, 3]) - surf.center)
+    surface_closest_opening = np.argmin(np.sum(distsq, axis=2), axis=0)
+    surface_opening_idx = np.argwhere(np.any(surface_opening_mask, axis=0))
 
-        self._obj_opening.extend(opening_face)
-
-      if self._obj_opening:
-        # surface 중 opening face 제거
-        _, op_norm, _, op_center, _ = face_info(self._obj_opening)
-        _, sur_norm, _, sur_center, _ = face_info(self._obj_surface)
-
-        # 표면(벽), 중 opening에 해당하는 면 추출
-        surface_opening_mask = is_same_face(op_faces=self._obj_opening,
-                                            op_norm=op_norm,
-                                            op_center=op_center,
-                                            srf_norm=sur_norm,
-                                            srf_center=sur_center,
-                                            tol=tol)
-
-        distsq = np.square(op_center.reshape([-1, 1, 3]) - sur_center)
-        surface_closest_opening = np.argmin(np.sum(distsq, axis=2), axis=0)
-        surface_opening_idx = np.argwhere(np.any(surface_opening_mask, axis=0))
-
-        if opening_volume:
-          self._obj_opening = [(surface_closest_opening[i], f)
-                               for i, f in enumerate(self._obj_surface)
-                               if i in surface_opening_idx]
-          self._obj_surface = [
-              f for i, f in enumerate(self._obj_surface)
-              if i not in surface_opening_idx
-          ]
-        else:
-          # interior 중 opening에 해당하는 면 추출
-          _, intr_norm, _, intr_center, _ = face_info(self._obj_interior)
-
-          intr_opening_mask = is_same_face(op_faces=self._obj_opening,
-                                           op_norm=op_norm,
-                                           op_center=op_center,
-                                           srf_norm=intr_norm,
-                                           srf_center=intr_center,
-                                           tol=tol)
-
-          distsq = np.square(op_center.reshape([-1, 1, 3]) - intr_center)
-          intr_closest_opening = np.argmin(np.sum(distsq, axis=2), axis=0)
-          intr_opening_idx = np.argwhere(np.any(intr_opening_mask, axis=0))
-
-          opening_from_surface = [(surface_closest_opening[i], f)
-                                  for i, f in enumerate(self._obj_surface)
-                                  if i in surface_opening_idx]
-          opening_from_interior = [(-intr_closest_opening[i], f)
-                                   for i, f in enumerate(self._obj_interior)
-                                   if i in intr_opening_idx]
-          self._obj_interior = [
-              f for i, f in enumerate(self._obj_interior)
-              if i not in intr_opening_idx
-          ]
-          self._obj_opening = opening_from_surface + opening_from_interior
-
-          # 표면(벽) 중 opening 부피와 일치하는 표면 제거
-          op_vol_faces = list(chain.from_iterable(self._op_faces))
-          _, op_vol_norm, _, op_vol_center, _ = face_info(op_vol_faces)
-          surface_opening_vol_mask = is_same_face(op_faces=op_vol_faces,
-                                                  op_norm=op_vol_norm,
-                                                  op_center=op_vol_center,
-                                                  srf_norm=sur_norm,
-                                                  srf_center=sur_center,
-                                                  tol=tol)
-
-          surface_opening_vol_idx = np.argwhere(
-              np.any(surface_opening_vol_mask, axis=0))
-
-          self._obj_surface = [
-              f for i, f in enumerate(self._obj_surface)
-              if i not in surface_opening_vol_idx
-          ]
+    if opening_volume:
+      self._obj_opening = [(surface_closest_opening[i], f)
+                           for i, f in enumerate(self._obj_surface)
+                           if i in surface_opening_idx]
+      self._obj_surface = [
+          f for i, f in enumerate(self._obj_surface)
+          if i not in surface_opening_idx
+      ]
+    else:
+      self._classify_opening_interior(
+          op=op,
+          surf=surf,
+          surface_closest_opening=surface_closest_opening,
+          surface_opening_idx=surface_opening_idx,
+          tol=tol)
 
   def classify_walls(self, tol=1e-4):
     if not self._walls:
@@ -294,7 +318,62 @@ class ObjConverter:
 
     self._obj_surface = tuple((x, y) for x, y in zip(names, self._obj_surface))
 
-    return
+  def _save_surface(self, temp_dir: Path, deflection):
+    if not self._walls:
+      surface_path = temp_dir.joinpath('surface.stl')
+      write_stl_file(a_shape=compound(self._obj_surface),
+                     filename=surface_path.as_posix(),
+                     linear_deflection=deflection[0],
+                     angular_deflection=deflection[1])
+      paths = [surface_path]
+    else:
+      assert self._obj_surface is not None
+
+      surfaces = defaultdict(list)
+      for name, surface in self._obj_surface:
+        surfaces[name].append(surface)
+
+      paths = []
+      for name, shapes in surfaces.items():
+        shape = shapes[0] if (len(shapes) == 1) else compound(shapes)
+        path = temp_dir.joinpath(f'Surface_{name}.stl')
+        write_stl_file(a_shape=shape,
+                       filename=path.as_posix(),
+                       linear_deflection=deflection[0],
+                       angular_deflection=deflection[1])
+        paths.append(path)
+
+    return paths
+
+  def _save_opening(self, temp_dir: Path, deflection):
+    assert self._obj_opening is not None
+
+    openings = defaultdict(list)
+    for idx, opening in self._obj_opening:
+      openings[idx].append(opening)
+
+    length = int(
+        np.ceil(np.log10(np.max([x[0] for x in self._obj_opening] + [1]))))
+
+    op_shapes = [compound(x) for x in openings.values()]
+
+    # Opening을 좌표에 따라 번호 수정
+    op_center_gp = [
+        GpropsFromShape(x).volume().CentreOfMass() for x in op_shapes
+    ]
+    op_center = np.array([[p.X(), p.Y(), p.Z()] for p in op_center_gp])
+    op_index = np.lexsort(op_center.T[::-1])
+
+    paths = []
+    for idx in range(len(openings)):
+      path = temp_dir.joinpath('opening_{:0{}d}.stl'.format(idx, length))
+      write_stl_file(a_shape=op_shapes[op_index[idx]],
+                     filename=path.as_posix(),
+                     linear_deflection=deflection[0],
+                     angular_deflection=deflection[1])
+      paths.append(path)
+
+    return paths
 
   def extract_faces(self,
                     obj_path,
@@ -312,73 +391,36 @@ class ObjConverter:
       self.classify_walls(tol=tol)
 
     with TemporaryDirectory() as temp_dir:
-      path_list = list()
+      temp_dir = Path(temp_dir)
 
-      if not self._walls:
-        surface_path = os.path.join(temp_dir, 'surface.stl')
-        write_stl_file(a_shape=compound(self._obj_surface),
-                       filename=surface_path,
-                       linear_deflection=deflection[0],
-                       angular_deflection=deflection[1])
-        path_list.append(surface_path)
-      else:
-        surfaces = defaultdict(list)
-        for name, surface in self._obj_surface:
-          surfaces[name].append(surface)
+      # surface
+      paths = self._save_surface(temp_dir=temp_dir, deflection=deflection)
 
-        for name, shapes in surfaces.items():
-          shape = shapes[0] if (len(shapes) == 1) else compound(shapes)
-          path = os.path.join(temp_dir, 'Surface_{}.stl'.format(name))
-          write_stl_file(a_shape=shape,
-                         filename=path,
-                         linear_deflection=deflection[0],
-                         angular_deflection=deflection[1])
-          path_list.append(path)
-
+      # interior
       if extract_interior and self._obj_interior:
-        interior_path = os.path.join(temp_dir, 'interior.stl')
+        interior_path = temp_dir.joinpath('interior.stl')
         write_stl_file(a_shape=compound(self._obj_interior),
-                       filename=interior_path,
+                       filename=interior_path.as_posix(),
                        linear_deflection=deflection[0],
                        angular_deflection=deflection[1])
-        path_list.append(interior_path)
+        paths.append(interior_path)
 
+      # opening
       if self._obj_opening:
-        openings = defaultdict(list)
-        for idx, opening in self._obj_opening:
-          openings[idx].append(opening)
+        paths.extend(
+            self._save_opening(temp_dir=temp_dir, deflection=deflection))
 
-        length = int(
-            np.ceil(np.log10(np.max([x[0] for x in self._obj_opening] + [1]))))
-
-        op_shapes = [compound(x) for x in openings.values()]
-
-        # Opening을 좌표에 따라 번호 수정
-        op_center = [
-            GpropsFromShape(x).volume().CentreOfMass() for x in op_shapes
-        ]
-        op_center = np.array([[p.X(), p.Y(), p.Z()] for p in op_center])
-        op_index = np.lexsort(op_center.T[::-1])
-
-        for idx in range(len(openings)):
-          path = os.path.join(temp_dir,
-                              'opening_{:0{}d}.stl'.format(idx, length))
-          write_stl_file(a_shape=op_shapes[op_index[idx]],
-                         filename=path,
-                         linear_deflection=deflection[0],
-                         angular_deflection=deflection[1])
-          path_list.append(path)
-
+      # additional faces
       if self._additional is not None:
         for face_name, face in self._additional.items():
-          path = os.path.join(temp_dir, face_name + '.stl')
+          path = temp_dir.joinpath(f'{face_name}.stl')
           write_stl_file(a_shape=face,
-                         filename=path,
+                         filename=path.as_posix(),
                          linear_deflection=deflection[0],
                          angular_deflection=deflection[1])
-          path_list.append(path)
+          paths.append(path)
 
-      stl_to_obj(obj_path, blender_path, *path_list)
+      stl_to_obj(obj_path, blender_path, *paths)
       fix_surface_name(obj_path)
 
   def valid_surfaces(self):
@@ -401,9 +443,7 @@ def fix_surface_name(obj_path):
 
   p = re.compile(r'((\w+_[a-z0-9]+)_){2}None',
                  re.IGNORECASE | re.MULTILINE | re.DOTALL)
-
   new_geom = [None for _ in range(len(geom))]
-
   for idx, line in enumerate(geom):
     new_geom[idx] = p.sub('\\2', line)
 
@@ -412,8 +452,6 @@ def fix_surface_name(obj_path):
   if new_geom != geom:
     with open(obj_path, 'w') as f:
       f.writelines(new_geom)
-
-  return
 
 
 def write_obj(compound: TopoDS_Compound,
