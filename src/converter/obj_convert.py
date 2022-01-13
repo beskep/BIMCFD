@@ -12,7 +12,6 @@ import numpy as np
 from loguru import logger
 from OCC.Core.BRepAlgo import BRepAlgo_Common
 from OCC.Core.BRepBuilderAPI import BRepBuilderAPI_MakeVertex
-from OCC.Core.gp import gp_Vec
 from OCC.Core.TopoDS import TopoDS_Compound, TopoDS_Face, TopoDS_Shape
 from OCC.Extend.DataExchange import write_stl_file
 from OCC.Extend.TopologyUtils import TopologyExplorer

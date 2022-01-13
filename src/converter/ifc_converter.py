@@ -959,7 +959,6 @@ class IfcConverter:
         cl = simplified['info']['original_geometry']['characteristic_length']
 
       max_cell_size = cl / options['grid_resolution']
-      # todo: max cell size 배율 수정?
 
     mesh_dict = self.openfoam_cf_mesh_dict(
         max_cell_size=max_cell_size,

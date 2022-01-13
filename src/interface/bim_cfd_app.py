@@ -71,12 +71,7 @@ class BimCfdApp(BimCfdAppBase):
     self._renderer: topo.TopoRenderer = None
     self._space_menu = None
 
-    # todo: 그래픽 관련 method 모두 mainthread로
-
-  # def on_start(self):
-  #   super().on_start()
-
-  #   self.solver_menu.set_items(text=openfoam.supported_solvers())
+    # XXX 프리즈 발생할 경우 그래픽 관련 method mainthread로
 
   def select_path(self, path):
     super().select_path(path)
@@ -232,8 +227,8 @@ class BimCfdApp(BimCfdAppBase):
     self.show_snackbar('형상 전처리 완료', duration=1.0)
 
   def show_geom_info(self, simplified):
-    # TODO: 표 다듬기 - 중앙 정렬
-    # todo: 단순화된 형상의 face 개수 증가하는 문제 해결 (un-brep/tessellation?)
+    # TODO 표 다듬기 - 중앙 정렬
+    # FIXME 단순화된 형상의 face 개수 증가하는 문제 해결 (un-brep/tessellation?)
     geom_cols = [
         ('변수', dp(50)),
         ('전처리 전', dp(50)),
@@ -296,7 +291,7 @@ class BimCfdApp(BimCfdAppBase):
       self.show_snackbar('형상 전처리 필요')
       return
 
-    # todo: outer faces, edges 개수만 표시하기
+    # TODO outer faces, edges 개수만 표시하기
     self.show_geom_info(simplified)
     self.show_material_info(simplified)
 

@@ -72,7 +72,7 @@ class DropDownMenu(MDBoxLayout):
       self._menu.use_icon_item = True
 
       self._items = None
-      # TODO: items 없애고 menu 아이템으로 연결
+      # TODO items 없애고 menu 아이템으로 연결
 
       self._menu.caller = self._button
       self._menu.on_release = self.select_item

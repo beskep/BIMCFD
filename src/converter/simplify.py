@@ -203,7 +203,7 @@ def classify_minor_faces(area: np.ndarray,
   # 주요 face/생략 대상 face 판단
   # 판단 순서는 1. 면적이 큰 순서대로,
   # 면적이 동일할 경우 2. 다른 면들과 각도가 비슷한 순서대로
-  # TODO: opening face는 아예 기준에서 빼버리기?
+  # XXX opening face는 아예 기준에서 빼버리기?
   for idx in np.lexsort([-avg_cos, -area]):  # pylint: disable=invalid-unary-operand-type
     if idx in minor_faces or (openings and idx in opening_face_idx):
       continue
@@ -338,7 +338,7 @@ def merge_inner_volume(
 
     # 내외부 점 / 부피 판단 (Convex Hull)
     hull = ConvexHull(np.vstack([pnts_cut, pnts_original]))
-    # TODO: coplanar 점 고려
+    # TODO coplanar 점 고려
 
     outer_pnts = hull.vertices[hull.vertices < pnts_cut.shape[0]]
     outer_solid_idx = np.unique(solid_idx[outer_pnts])

@@ -33,8 +33,8 @@ _SOLVERS_ENERGY = (
     'buoyantSimpleFoam',
     'buoyantBousinessqSimpleFoam',
 )
-# _SOLVERS_CONDUCTIVITY = ('buoyantSimpleFoam',)
-_SOLVERS_CONDUCTIVITY = tuple()  # fixme: buoyantSimpleFoam에 열전도 적용 안됨
+# _SOLVERS_CONDUCTIVITY = ('buoyantSimpleFoam',) # buoyantSimpleFoam에 열전도 적용 안됨
+_SOLVERS_CONDUCTIVITY = tuple()
 _SOLVERS_TURBULENCE = (
     'simpleFoam',
     'buoyantSimpleFoam',

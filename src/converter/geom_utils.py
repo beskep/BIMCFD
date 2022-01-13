@@ -224,7 +224,7 @@ def calc_split_vol_ratio(split_original: TopoDS_Compound,
       [[p.X(), p.Y(), p.Z()] for p in [p.CentreOfMass() for p in props_buffer]])
 
   # 각 buffer의 solid에 대한 original의 solid의 거리
-  # todo: 거리 말고 다른 판단방법으로 바꾸기
+  # XXX 거리 말고 다른 판단 방법으로 바꾸기?
   dist = _solid_center_distance(center_buffer, center_original)
 
   dist_argsort = np.argsort(dist, axis=1)
