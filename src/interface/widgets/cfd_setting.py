@@ -127,7 +127,12 @@ class CfdSettingContent(MDBoxLayout):
         hint_text: 'No. of subdomains'
         text: ''
         id: text_num_of_subdomains
-      MDBoxLayout:
+      TextFieldUnit:
+        # TODO 위치 조정
+        # TODO 값 적용
+        hint_text: '풍속 고도 분포 계수'
+        text: '0.22'
+        id: text_wind_profile_roughness
   '''
 
   def __init__(self, *args, **kwargs):
@@ -166,6 +171,7 @@ class CfdSettingDialog(MDDialog):
       'text_boundary_cell_size',
       'text_boundary_layers_count',
       'text_num_of_subdomains',
+      'text_wind_profile_roughness',
   )
 
   def __init__(self, title='CFD 세부 설정', **kwargs):

@@ -355,30 +355,13 @@ class BimCfdAppBase(MDApp):
 
   def get_openfoam_options(self):
     simplfication_opt = self.get_simplification_options()
+
     try:
       solver = self.solver_menu.selected_item_text()
     except AttributeError:
       solver = 'buoyantSimpleFoam'
 
-    try:
-      dialog_opt = self.cfd_dialog.options
-    except AttributeError:
-      dialog_opt = {
-          'flag_friction': False,
-          'flag_heat_flux': True,
-          'flag_mesh_resolution': True,
-          'flag_mesh_size': False,
-          'text_boundary_cell_size': 0,
-          'text_boundary_layers_count': 0,
-          'text_external_htc': None,
-          'text_external_size': 5,
-          'text_external_temperature': 293.15,
-          'text_mesh_min_size': 0,
-          'text_mesh_resolution': 24,
-          'text_mesh_size': None,
-          'text_num_of_subdomains': None,
-      }
-
+    dialog_opt = self.cfd_dialog.options
     ofopt = {
         'solver': solver,
         'flag_external_zone': simplfication_opt['flag_external_zone'],
