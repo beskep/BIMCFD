@@ -318,7 +318,6 @@ class BimCfdAppBase(MDApp):
         ('flag_preserve_openings', True, '개구부 형상 유지'),
         ('flag_opening_volume', True, '개구부 부피 유지'),
         ('flag_internal_faces', False, '내부 표면 추출'),
-        ('flag_external_zone', False, '외부 영역 추출'),
         ('precision', 0.1, '정밀도'),
         ('dist_threshold', 0.5, '단순화 거리 기준'),
         ('vol_threshold', 0.0, '단순화 부피 기준'),
@@ -364,7 +363,8 @@ class BimCfdAppBase(MDApp):
     dialog_opt = self.cfd_dialog.options
     ofopt = {
         'solver': solver,
-        'flag_external_zone': simplfication_opt['flag_external_zone'],
+        'flag_external_zone':
+            (self.root.ids.cfd_panel.ids.flag_external_zone.state == 'down'),
         'flag_interior_faces': simplfication_opt['flag_internal_faces'],
         'flag_heat_flux': dialog_opt['flag_heat_flux'],
         'flag_friction': dialog_opt['flag_friction'],

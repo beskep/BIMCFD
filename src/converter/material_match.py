@@ -1,5 +1,6 @@
 import json
 import re
+from collections import namedtuple
 from typing import Tuple
 
 from utils import DIR
@@ -13,6 +14,9 @@ from ht import insulation
 
 DB_PATH = DIR.RESOURCE.joinpath('material.csv')
 KOR_ENG_PATH = DIR.RESOURCE.joinpath('material_kor_eng.json')
+
+Friction = namedtuple('Friction',
+                      ['roughness', 'eng_name', 'nearest_material', 'score'])
 
 
 def load_kor_eng(path):
@@ -84,7 +88,7 @@ class MaterialMatch:
 
     return eng_name, score
 
-  def friction(self, material_name: str) -> Tuple[float, str, str, int]:
+  def friction(self, material_name: str) -> Friction:
     """
     이름이 가장 유사한 재료의 조도 반환
     입력값이 False인 경우 모든 입력값 None
@@ -107,7 +111,7 @@ class MaterialMatch:
     roughness = friction.material_roughness(nearest_material)
     score = self._scorer(eng_name, nearest_material)
 
-    return roughness, eng_name, nearest_material, score
+    return Friction(roughness, eng_name, nearest_material, score)
 
   def thermal_properties(self, material_name: str) -> Tuple[dict, str, str]:
     """이름이 가장 유사한 재료의 열적 특성 반환

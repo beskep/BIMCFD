@@ -10,7 +10,9 @@ from loguru import logger
 
 from converter import ifc_converter as ifccnv
 from converter import openfoam
+from converter.ifc_utils import entity_name
 from converter.material_match import DB_PATH as MATERIAL_DB_PATH
+from converter.openfoam_converter import MaterialMatch
 from interface import kvtools
 from interface.bim_cfd_base import BimCfdAppBase, with_spinner
 from interface.widgets import topo_widget as topo
@@ -109,7 +111,7 @@ class BimCfdApp(BimCfdAppBase):
       width = len(str(len(spaces) + 1))
       names = [
           IfcEntityText.menu_text(index=(i + 1),
-                                  name=ifccnv.entity_name(entity),
+                                  name=entity_name(entity),
                                   width=width)
           for i, entity in enumerate(spaces)
       ]
@@ -255,7 +257,7 @@ class BimCfdApp(BimCfdAppBase):
 
   def show_material_info(self, simplified):
     walls = simplified['walls']
-    _, match_dict = self._converter.match_thermal_propes(walls=walls)
+    _, match_dict = MaterialMatch().match_thermal_prop(walls=walls)
     materials = sorted(list(match_dict.keys()))
 
     cols = [
@@ -315,7 +317,7 @@ class BimCfdApp(BimCfdAppBase):
     self._converter.openfoam_case(simplified=simplified,
                                   save_dir=save_dir,
                                   case_name='BIMCFD',
-                                  openfoam_options=openfoam_options)
+                                  options=openfoam_options)
 
     self.show_snackbar('저장 완료')
 
