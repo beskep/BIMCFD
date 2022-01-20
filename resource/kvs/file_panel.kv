@@ -15,8 +15,7 @@
 
             MDBoxLayout:
                 orientation: 'vertical'
-                padding: dp(10)
-                spacing: dp(10)
+                padding: 0, dp(10), 0, 0
 
                 MDBoxLayout:
                     orientation: 'horizontal'
@@ -31,12 +30,16 @@
                         text: '파일 선택'
                         on_release: app.open_file_manager('bim')
 
-                MDLabel:
-                    text: '환경변수 설정 공간 선택'
-
                 MDBoxLayout:
-                    orientation: 'horizontal'
-                    spacing: dp(5)
-                    DropDownMenu:
-                        id: space
-                        text: '[color=#A9A9A9]선택[/color]'
+                    orientation: 'vertical'
+
+                    MDLabel:
+                        text: '환경변수 설정 공간 선택'
+                        font_style: 'Body2'
+
+                    MDBoxLayout:
+                        orientation: 'horizontal'
+                        spacing: dp(5)
+                        DropDownMenu:
+                            id: space
+                            text: '[color=#A9A9A9]선택[/color]'

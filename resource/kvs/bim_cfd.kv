@@ -17,12 +17,14 @@
     font_name: 'NotoSansKR'
 
 <BIMCFDPanel@MDCard>:
-    elevation: 1
+    elevation: 0
+    md_bg_color: app.theme_cls.bg_light
 
 <BimCfdWidget>:
     orientation: 'vertical'
     padding: dp(10)
     spacing: dp(10)
+    md_bg_color: app.theme_cls.bg_darkest
 
     MDBoxLayout:
         orientation: 'horizontal'
@@ -71,15 +73,16 @@
             elevation: 0
 
     MDScreen:
-        height: 35
+        height: 30
         size_hint_y: None
-        radius: [5, 5, 5, 5]
+        radius: (4, 4, 4, 4)
         md_bg_color: (0.741, 0.741, 0.741, 1)
 
         MDBoxLayout:
-            padding: dp(5)
+            padding: dp(10), 0, 0, 0
 
             MDLabel:
                 id: status_bar
+                font_style: 'Body2'
                 text: 'CFD Environment Variables'
                 text_color: (1, 1, 1, 0.9)

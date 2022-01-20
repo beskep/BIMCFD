@@ -37,6 +37,10 @@ class TextFieldPath(TextFieldFont):
 
     super().on_text(instance, text)
 
+  def on_focus(self, *args):
+    self.hint_text = ''
+    super().on_focus(*args)
+
 
 class TextFieldNumeric(TextFieldFont):
 
