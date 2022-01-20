@@ -4,8 +4,6 @@ from itertools import chain
 from pathlib import Path
 from typing import Optional
 
-from utils import DIR
-
 from ifcopenshell import entity_instance as IfcEntity
 from loguru import logger
 
@@ -16,13 +14,9 @@ from converter.material_match import Friction
 from converter.material_match import MaterialMatch as _MaterialMatch
 from converter.openfoam import BoundaryFieldDict, OpenFoamCase
 
-PATH_MATERIAL_LAYER = DIR.TEMPLATE.joinpath('material_layer.txt')
-PATH_TEMPERATURE = DIR.TEMPLATE.joinpath('temperature.txt')
-PATH_MATERIAL_LAYER.stat()
-PATH_TEMPERATURE.stat()
 
-
-def to_openfoam_vector(values):
+def ofvector(values):
+  """OpenFOAM vector string"""
   return '( ' + ' '.join([str(x) for x in values]) + ' )'
 
 
@@ -31,10 +25,28 @@ ThermalProps = namedtuple(
     ['name', 'thickness', 'matched_name', 'conductivity', 'score'])
 
 
+def _sort_foam_file_values(ff: FoamFile,
+                           order=('dimensions', '#include', 'include',
+                                  'internalField')):
+  keys = (list(order) +
+          [x for x in ff.values.keys() if x not in order + ('boundaryField',)] +
+          ['boundaryField'])
+
+  values = OrderedDict()
+  for key in keys:
+    key_ = '#include' if key == 'include' else key
+    values[key_] = ff.values.get(key, None)
+
+  ff.values = values
+
+  return ff
+
+
 @dataclass
 class OpenFoamOption:
   solver: str = 'simpleFoam'
-  flag_energy: bool = True
+
+  flag_energy: bool = False
   flag_heat_flux: bool = False
   flag_friction: bool = False
   flag_interior_faces: bool = False
@@ -45,6 +57,7 @@ class OpenFoamOption:
   heat_transfer_coefficient: str = '1e8'
   roughness_constant: float = 0.5
   roughness_factor: float = 1.0
+  z0: float = 0.20
 
   max_cell_size: Optional[float] = None
   min_cell_size: Optional[float] = None
@@ -56,6 +69,17 @@ class OpenFoamOption:
   def __post_init__(self):
     if not OpenFoamCase.is_supported_solver(self.solver):
       raise ValueError(f'지원하지 않는 solver입니다: {self.solver}')
+
+    if self.flag_external_zone:
+      if not self.solver.startswith('simpleFoam'):
+        raise ValueError('외부 영역 연산은 `simpleFoamExternal` 솔버만 지원합니다.')
+
+      self.solver = 'simpleFoamExternal'
+      self.max_cell_size = 0.5
+      logger.info(
+          'flag_external_zone -> '
+          '{{solver: "{}", max_cell_size: {}}}', self.solver,
+          self.max_cell_size)
 
   @classmethod
   def from_dict(cls, d: dict):
@@ -145,6 +169,7 @@ class OpenFoamConverter:
   _TW = 15  # thermal width
   _FW = 17  # friction width
   _MW = 27  # mesh width
+  _EMPTY = OrderedDict([('type', 'empty')])
 
   def __init__(self,
                options: Optional[dict] = None,
@@ -202,8 +227,8 @@ class OpenFoamConverter:
         bf.add_value('mode', 'coefficient')
         bf.add_value('Ta', f'uniform {self._opt.external_temperature}')
         bf.add_value('h', f'uniform {heat_transfer_coefficient}')
-        bf.add_value('thicknessLayers', to_openfoam_vector(prop.thickness))
-        bf.add_value('kappaLayers', to_openfoam_vector(prop.conductivity))
+        bf.add_value('thicknessLayers', ofvector(prop.thickness))
+        bf.add_value('kappaLayers', ofvector(prop.conductivity))
         bf.add_value('kappaMethod', 'solidThermo')
       else:
         bf.add_comment('Material information not specified')
@@ -375,6 +400,10 @@ class OpenFoamConverter:
 
     return bfs
 
+  def external_abl_conditions(self, case: OpenFoamCase):
+    ff = [x for x in case.foam_files if x.name == 'ABLConditions'][0]
+    ff.values['z0'] = self._opt.z0
+
   @staticmethod
   def _zero_boundary_fields(case: OpenFoamCase,
                             target_fields: Optional[list] = None,
@@ -395,22 +424,20 @@ class OpenFoamConverter:
 
     return ffs
 
-  @staticmethod
-  def _zero_boundary_field_dict(foam_file: FoamFile, openings, inlets, outlets,
-                                walls):
-    bf_template = foam_file.values['boundaryField']
-    opening_field = bf_template['opening']
-    fields = (
-        bf_template['opening'],
-        bf_template.get('inlet', opening_field),
-        bf_template.get('outlet', opening_field),
-        bf_template['wall'],
-    )
-
+  def _zero_boundary_field_dict(self, foam_file: FoamFile, openings, inlets,
+                                outlets, walls):
+    template: OrderedDict = foam_file.values['boundaryField']
     bf = BoundaryFieldDict()
-    for names, field in zip([openings, inlets, outlets, walls], fields):
-      for surface in names:
-        bf[surface] = field
+
+    for names, field_type in zip([openings, inlets, outlets, walls],
+                                 ['opening', 'inlet', 'outlet', 'wall']):
+      bft = template.get(field_type, self._EMPTY)
+
+      if 'include' in bft:
+        bft['#include'] = bft.pop('include')
+
+      for name in names:
+        bf[name] = bft
         bf.add_empty_line()
 
     return bf
@@ -419,17 +446,18 @@ class OpenFoamConverter:
                           case: OpenFoamCase,
                           wall_names: list,
                           opening_names=None,
-                          inlet_names=None,
-                          outlet_names=None,
                           target_fields: Optional[list] = None,
                           drop_fields: Optional[list] = None):
     """수동 생성 안한 나머지 field 설정"""
     opening_names = opening_names or []
-    inlet_names = inlet_names or []
-    outlet_names = outlet_names or []
-    wall_names = [
-        (x if x.startswith('Surface_') else 'Surface_' + x) for x in wall_names
-    ]
+
+    if not self._opt.flag_external_zone:
+      inlet_names = []
+      outlet_names = []
+    else:
+      inlet_names = ['External_0']
+      outlet_names = ['External_1', 'External_2', 'External_3', 'Ceiling']
+      wall_names += ['Ground']
 
     ffs = self._zero_boundary_fields(case=case,
                                      target_fields=target_fields,
@@ -440,7 +468,9 @@ class OpenFoamConverter:
                                           inlets=inlet_names,
                                           outlets=outlet_names,
                                           walls=wall_names)
+
       case.change_boundary_field(variable=ff.name, boundary_field=bf)
+      _sort_foam_file_values(ff=ff)
 
   def cf_mesh_dict(self, max_cell_size: float):
     mesh_dict = BoundaryFieldDict(width=self._MW)
@@ -496,39 +526,7 @@ class OpenFoamConverter:
 
     return mesh_dict
 
-  def write_openfoam_case(self,
-                          simplified: dict,
-                          save_dir: Path,
-                          name='BIMCFD'):
-    case = OpenFoamCase.from_template(solver=self._opt.solver,
-                                      save_dir=save_dir,
-                                      name=name)
-
-    wall_names = ['Surface_' + x for x in simplified['wall_names']]
-    opening_names = simplified['opening_names']
-
-    drop_fields = []
-    if (OpenFoamCase.is_energy_available(self._opt.solver) and
-        self._opt.flag_energy):
-      bf_t = self.temperature_dict(surface=simplified['walls'],
-                                   surface_name=wall_names,
-                                   opening_names=opening_names)
-      case.change_boundary_field(variable='T', boundary_field=bf_t)
-      drop_fields.append('T')
-
-    if (OpenFoamCase.is_turbulence_available(self._opt.solver) and
-        self._opt.flag_friction):
-      bf_nut = self.rough_wall_nut_dict(surface=simplified['walls'],
-                                        surface_name=wall_names,
-                                        opening_names=opening_names)
-      case.change_boundary_field(variable='nut', boundary_field=bf_nut)
-      drop_fields.append('nut')
-
-    self.zero_boundary_field(case=case,
-                             wall_names=wall_names,
-                             opening_names=opening_names,
-                             drop_fields=drop_fields)
-
+  def _max_cell_size(self, simplified: dict) -> float:
     max_cell_size = self._opt.max_cell_size
     if not max_cell_size:
       try:
@@ -538,9 +536,65 @@ class OpenFoamConverter:
 
       max_cell_size = cl / self._opt.grid_resolution
 
+    return max_cell_size
+
+  def write_openfoam_case(self,
+                          simplified: dict,
+                          save_dir: Path,
+                          name='BIMCFD'):
+    case = OpenFoamCase.from_template(solver=self._opt.solver,
+                                      save_dir=save_dir,
+                                      name=name)
+
+    # wall and opening names
+    wall_names = ['Surface_' + x for x in simplified['wall_names']]
+    opening_names = simplified['opening_names']
+    if self._opt.flag_external_zone:
+      # 외부 영역 해석하는 경우 opening은 wall로 취급
+      wall_names += opening_names
+      opening_names = []
+
+    drop_fields = ['ABLConditions', 'initialConditions']
+
+    # temperature
+    if (OpenFoamCase.is_energy_available(self._opt.solver) and
+        self._opt.flag_energy):
+      bf_t = self.temperature_dict(surface=simplified['walls'],
+                                   surface_name=wall_names,
+                                   opening_names=opening_names)
+      case.change_boundary_field(variable='T', boundary_field=bf_t)
+      drop_fields.append('T')
+
+    # nut
+    if (OpenFoamCase.is_turbulence_available(self._opt.solver) and
+        self._opt.flag_friction):
+      bf_nut = self.rough_wall_nut_dict(surface=simplified['walls'],
+                                        surface_name=wall_names,
+                                        opening_names=opening_names)
+      case.change_boundary_field(variable='nut', boundary_field=bf_nut)
+      drop_fields.append('nut')
+
+    # ABLConditions (external zone)
+    if self._opt.flag_external_zone:
+      self.external_abl_conditions(case=case)
+
+    # 나머지 `0` 폴더 설정
+    self.zero_boundary_field(case=case,
+                             wall_names=wall_names,
+                             opening_names=opening_names,
+                             drop_fields=drop_fields)
+
+    # mesh
+    max_cell_size = self._max_cell_size(simplified=simplified)
     mesh_dict = self.cf_mesh_dict(max_cell_size=max_cell_size)
     case.change_foam_file_value('meshDict', mesh_dict)
 
+    # case 저장
     case.save(overwrite=False, minimum=False)
-    case.save_shell(solver=self._opt.solver,
+
+    # sh 저장
+    solver = self._opt.solver
+    if solver.startswith('simpleFoam'):
+      solver = 'simpleFoam'
+    case.save_shell(solver=solver,
                     num_of_subdomains=self._opt.num_of_subdomains)

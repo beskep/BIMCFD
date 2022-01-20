@@ -349,24 +349,24 @@ class IfcConverter:
     except (IOError, RuntimeError) as e:
       logger.error('stl 저장 실패: {}', e)
 
-    try:
-      DataExchange.write_step_file(a_shape=shape,
-                                   filename=os.path.join(path, 'geometry.stp'))
-    except (IOError, RuntimeError) as e:
-      logger.error('stp 저장 실패: {}', e)
+    # try:
+    #   DataExchange.write_step_file(a_shape=shape,
+    #                                filename=os.path.join(path, 'geometry.stp'))
+    # except (IOError, RuntimeError) as e:
+    #   logger.error('stp 저장 실패: {}', e)
 
     try:
       extract_opening_volume = simplified['info']['simplification'][
           'extract_opening_volume']
-      write_obj(compound=shape,
-                space=simplified['space'],
-                openings=simplified['openings'],
-                walls=simplified['wall_shapes'],
-                obj_path=os.path.join(path, 'geometry_interior.obj'),
-                deflection=self.brep_deflection,
-                wall_names=simplified['wall_names'],
-                extract_interior=True,
-                extract_opening_volume=extract_opening_volume)
+      # write_obj(compound=shape,
+      #           space=simplified['space'],
+      #           openings=simplified['openings'],
+      #           walls=simplified['wall_shapes'],
+      #           obj_path=os.path.join(path, 'geometry_interior.obj'),
+      #           deflection=self.brep_deflection,
+      #           wall_names=simplified['wall_names'],
+      #           extract_interior=True,
+      #           extract_opening_volume=extract_opening_volume)
       write_obj(compound=shape,
                 space=simplified['space'],
                 openings=simplified['openings'],

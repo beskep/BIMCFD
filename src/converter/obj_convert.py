@@ -432,7 +432,13 @@ class ObjConverter:
 
 
 def fix_surface_name(obj_path):
-  """blender에서 저장한 표면 이름 (e.g. Surface_0_Surface_0_None)을 수정"""
+  """
+  blender에서 저장한 표면 이름을 수정
+
+  Surface_0_Surface_0_None -> Surface_0
+  Surface_F1W2_Surface_F1W2_None -> Surface_F1W2
+  Ceiling_Ceiling_None -> Ceiling
+  """
   try:
     with open(obj_path) as f:
       geom = f.readlines()
@@ -440,7 +446,7 @@ def fix_surface_name(obj_path):
     logger.error('Obj 표면 이름 변환 오류')
     return
 
-  p = re.compile(r'((\w+_[a-z0-9]+)_){2}None',
+  p = re.compile(r'(([a-z]+(_[a-z0-9]*)?)_){2}None',
                  re.IGNORECASE | re.MULTILINE | re.DOTALL)
   new_geom = [None for _ in range(len(geom))]
   for idx, line in enumerate(geom):
@@ -516,5 +522,7 @@ def write_obj(compound: TopoDS_Compound,
                           tol=tol,
                           extract_interior=extract_interior,
                           deflection=deflection)
+
+  # TODO mtl 지우기
 
   return converter.valid_surfaces()

@@ -26,6 +26,7 @@ Header.set_header(_DEFAULT_HEADER)
 
 _SOLVERS = (
     'simpleFoam',
+    'simpleFoamExternal',
     'buoyantSimpleFoam',
     'buoyantBousinessqSimpleFoam',
 )
@@ -37,6 +38,7 @@ _SOLVERS_ENERGY = (
 _SOLVERS_CONDUCTIVITY = tuple()
 _SOLVERS_TURBULENCE = (
     'simpleFoam',
+    'simpleFoamExternal',
     'buoyantSimpleFoam',
     'buoyantBousinessqSimpleFoam',
 )
@@ -44,15 +46,29 @@ _SOLVER_PATH = {x.lower(): utils.DIR.TEMPLATE.joinpath(x) for x in _SOLVERS}
 for x in _SOLVER_PATH.values():
   assert x.exists(), x
 
-_MESH_SH = (b'surfaceFeatureEdges -angle 0 geometry.obj geometry.fms\n'
-            b'cartesianMesh\n'
-            b'checkMesh | tee log.mesh\n'
-            b'decomposePar -force')
-_RUN_SH = b'%s | tee log.run\nfoamLog log.run'
-_PARALLEL_RUN_SH = (b'mpirun -np %s %s -parallel | tee log.run\n'
-                    b'reconstructPar\n'
-                    b'postProcess -func "mag(U)"\n'
-                    b'foamLog log.run')
+# _MESH_SH = (b'surfaceFeatureEdges -angle 0 geometry.obj geometry.fms\n'
+#             b'cartesianMesh\n'
+#             b'checkMesh | tee log.mesh\n'
+#             b'decomposePar -force')
+
+# _RUN_SH = b'%s | tee log.run\nfoamLog log.run'
+# _PARALLEL_RUN_SH = (b'mpirun -np %s %s -parallel | tee log.run\n'
+#                     b'reconstructPar\n'
+#                     b'postProcess -func "mag(U)"\n'
+#                     b'foamLog log.run')
+
+
+class _Shell:
+  RUN = b'%s | tee log.run\nfoamLog log.run'
+  RUN_PARALLEL = (b'mpirun -np %s %s -parallel | tee log.run\n'
+                  b'reconstructPar\n'
+                  b'postProcess -func "mag(U)"\n'
+                  b'foamLog log.run')
+  MESH = (b'surfaceFeatureEdges -angle 0 geometry.obj geometry.fms\n'
+          b'cartesianMesh\n'
+          b'checkMesh | tee log.mesh')
+  MESH_PARALLEL = MESH + b'\ndecomposePar -force'
+
 
 StrPath = Union[str, Path]
 
@@ -366,26 +382,25 @@ class OpenFoamCase(ButterflyCase):
     with open(foam_path, 'w') as f:
       f.write('')
 
-    # mesh.sh
-    mesh_path = proj_dir.joinpath('mesh.sh')
-    with mesh_path.open('wb') as f:
-      f.write(_MESH_SH)  # type: ignore
-
-    # decomposeParDict, run.sh
+    # shell script
     if num_of_subdomains and num_of_subdomains > 1:
       decom = DecomposeParDict.scotch(numberOfSubdomains=int(num_of_subdomains))
       decom.save(proj_dir)
 
-      run_sh = _PARALLEL_RUN_SH % (
-          str(int(num_of_subdomains)).encode(),
-          solver.encode(),
-      )
+      shell_mesh = _Shell.MESH_PARALLEL
+      shell_run = _Shell.RUN_PARALLEL % (str(
+          int(num_of_subdomains)).encode(), solver.encode())
     else:
-      run_sh = _RUN_SH % solver.encode()
+      shell_mesh = _Shell.MESH
+      shell_run = _Shell.RUN % solver.encode()
+
+    mesh_path = proj_dir.joinpath('mesh.sh')
+    with mesh_path.open('wb') as f:
+      f.write(shell_mesh)  # type: ignore
 
     run_path = proj_dir.joinpath('run.sh')
     with run_path.open('wb') as f:
-      f.write(run_sh)  # type: ignore
+      f.write(shell_run)  # type: ignore
 
     # simulate
     with proj_dir.joinpath('simulate').open('wb') as f:

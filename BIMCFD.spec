@@ -1,4 +1,5 @@
 # -*- mode: python ; coding: utf-8 -*-
+import os
 import sys
 from pathlib import Path
 
@@ -8,9 +9,9 @@ from PyInstaller import compat
 
 sys.setrecursionlimit(5000)
 
-SRC_DIR = Path(__file__).parent.joinpath('src').as_posix()
-if SRC_DIR not in sys.path:
-  sys.path.insert(0, SRC_DIR)
+SRC = os.path.normpath(os.path.abspath('./src'))
+if SRC not in sys.path:
+  sys.path.insert(0, SRC)
 
 from kivymd import hooks_path
 
@@ -29,7 +30,7 @@ deps['binaries'].append((libpng.as_posix(), '.'))
 a = Analysis(['BIMCFD.py'],
              pathex=['D:\\Python\\BIMCFD'],
              datas=[('resource\\', 'resource\\')],
-             hookspath=[hooks_path, SRC_DIR],
+             hookspath=[hooks_path, SRC],
              runtime_hooks=runtime_hooks(),
              win_no_prefer_redirects=False,
              win_private_assemblies=False,

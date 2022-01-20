@@ -38,7 +38,8 @@ def with_spinner(fn):
   """
 
   def fn_and_deactivate(self, *args, **kwargs):
-    fn(self, *args, **kwargs)
+    with logger.catch(reraise=True):
+      fn(self, *args, **kwargs)
     self.activate_spinner(False)
 
   def wrapper(self, *args, **kwargs):
@@ -100,7 +101,7 @@ class BimCfdAppBase(MDApp):
     self._save_dir = '\\'
 
     self._space_menu: DropDownMenu = None
-    self._solver_menu: DropDownMenu = None
+    # self._solver_menu: DropDownMenu = None
 
     self._spinner: MDSpinner = None
 
@@ -355,14 +356,9 @@ class BimCfdAppBase(MDApp):
   def get_openfoam_options(self):
     simplfication_opt = self.get_simplification_options()
 
-    try:
-      solver = self.solver_menu.selected_item_text()
-    except AttributeError:
-      solver = 'buoyantSimpleFoam'
-
     dialog_opt = self.cfd_dialog.options
     ofopt = {
-        'solver': solver,
+        'solver': 'simpleFoam',
         'flag_external_zone':
             (self.root.ids.cfd_panel.ids.flag_external_zone.state == 'down'),
         'flag_interior_faces': simplfication_opt['flag_internal_faces'],
@@ -370,7 +366,8 @@ class BimCfdAppBase(MDApp):
         'flag_friction': dialog_opt['flag_friction'],
         'external_temperature': dialog_opt['text_external_temperature'],
         'heat_transfer_coefficient': dialog_opt['text_external_htc'],
-        'external_zone_size': dialog_opt['text_external_size']
+        'external_zone_size': dialog_opt['text_external_size'],
+        'z0': dialog_opt['text_wind_profile_roughness']
     }
 
     if dialog_opt['flag_mesh_resolution']:

@@ -128,8 +128,6 @@ class CfdSettingContent(MDBoxLayout):
         text: ''
         id: text_num_of_subdomains
       TextFieldUnit:
-        # TODO 위치 조정
-        # TODO 값 적용
         hint_text: '풍속 고도 분포 계수'
         text: '0.22'
         id: text_wind_profile_roughness
