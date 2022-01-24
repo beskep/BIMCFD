@@ -2,7 +2,7 @@ import os
 import re
 from pathlib import Path
 
-import utils
+from utils import DIR
 
 from kivy.clock import mainthread
 from kivy.metrics import dp
@@ -347,8 +347,8 @@ class BimCfdApp(BimCfdAppBase):
 
 
 def main():
-  font_regular = utils.DIR.RESOURCE.joinpath('NotoSansCJKkr-Medium.otf')
-  font_bold = utils.DIR.RESOURCE.joinpath('NotoSansCJKkr-Bold.otf')
+  font_regular = DIR.RESOURCE.joinpath('font/NotoSansCJKkr-Medium.otf')
+  font_bold = DIR.RESOURCE.joinpath('font/NotoSansCJKkr-Bold.otf')
 
   kvtools.register_font(name='NotoSansKR',
                         fn_regular=font_regular.as_posix(),
@@ -356,7 +356,7 @@ def main():
   kvtools.config()
   kvtools.set_window_size(size=(1280, 720))
 
-  kv_dir = utils.DIR.RESOURCE.joinpath('kvs')
+  kv_dir = DIR.RESOURCE.joinpath('kvs')
   kvs = [
       'bim_cfd',
       'file_panel',

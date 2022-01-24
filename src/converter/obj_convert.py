@@ -6,7 +6,7 @@ from pathlib import Path
 from tempfile import TemporaryDirectory
 from typing import Collection, List, Optional, Union
 
-import utils
+from utils import DIR
 
 import numpy as np
 from loguru import logger
@@ -24,8 +24,8 @@ from converter.simplify import face_info
 
 BLENDER_FOUNDATION_PATH = Path(r'C:\Program Files\Blender Foundation')
 
-EMPTY_BLEND_PATH = utils.DIR.RESOURCE.joinpath('empty.blend')
-BLENDER_SCRIPT_PATH = utils.DIR.RESOURCE.joinpath('blender.py')
+EMPTY_BLEND_PATH = DIR.RESOURCE.joinpath('misc/empty.blend')
+BLENDER_SCRIPT_PATH = DIR.RESOURCE.joinpath('misc/blender.py')
 EMPTY_BLEND_PATH.stat()
 BLENDER_SCRIPT_PATH.stat()
 

@@ -13,7 +13,7 @@ from kivy.uix.widget import Widget
 
 from interface.widgets.topo_mesh import TopoDsMesh
 
-_GLSL_PATH = utils.DIR.RESOURCE.joinpath('color.glsl')
+_GLSL_PATH = utils.DIR.RESOURCE.joinpath('misc/color.glsl')
 _GLSL_PATH.stat()
 
 

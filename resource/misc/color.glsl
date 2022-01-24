@@ -28,7 +28,6 @@ void main (void) {
     normal_vec = vec4(v_normal,0.0);
     gl_Position = projection_mat * pos;
     frag_color = color;
-
 }
 
 
@@ -50,11 +49,11 @@ void main (void){
 
     // reflectance based on lamberts law of cosine
     // float theta = clamp(dot(v_normal, v_light), 0.0, 1.0);
-    float theta = clamp(abs(dot(v_normal, v_light)), 0.0, 1.0);
+    float theta = clamp(abs(dot(v_normal, v_light)) - 0.1, 0.0, 1.0);
 
     gl_FragColor = vec4(
-      frag_color[0] * theta,
-      frag_color[1] * theta,
-      frag_color[2] * theta,
-      frag_color[3]);
+        frag_color[0] * theta,
+        frag_color[1] * theta,
+        frag_color[2] * theta,
+        frag_color[3]);
 }

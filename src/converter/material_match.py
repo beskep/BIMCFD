@@ -12,8 +12,8 @@ from fuzzywuzzy.process import extractOne
 from fluids import friction
 from ht import insulation
 
-DB_PATH = DIR.RESOURCE.joinpath('material.csv')
-KOR_ENG_PATH = DIR.RESOURCE.joinpath('material_kor_eng.json')
+DB_PATH = DIR.RESOURCE.joinpath('misc/material.csv')
+KOR_ENG_PATH = DIR.RESOURCE.joinpath('misc/material_kor_eng.json')
 
 Friction = namedtuple('Friction',
                       ['roughness', 'eng_name', 'nearest_material', 'score'])
