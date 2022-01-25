@@ -92,6 +92,7 @@ def stl_to_obj(obj_path, blender_path: Union[None, str, Path], *args):
 def get_face_id(shape: TopoDS_Shape, hash_upper=1e8):
   faces = tuple(TopologyExplorer(shape).faces())
   ids = tuple(face.HashCode(int(hash_upper)) for face in faces)
+
   return faces, ids
 
 

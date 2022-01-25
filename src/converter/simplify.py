@@ -559,7 +559,6 @@ def simplify_space(
     threshold_surface_angle=0.0,
     threshold_surface_vol_ratio=0.5,
     relative_threshold=False,
-    fuzzy=0.0,
     tol_bbox=1e-8,
     tol_cut=0.0,
     buffer_size=2,
@@ -598,8 +597,6 @@ def simplify_space(
       `True`일 경우, threshold_internal_volume는 shape의 부피 대비 비율,
       threshold_internal_length는 shape의 특성길이 (부피 / 표면적)
       대비 비율로 계산함.
-  fuzzy : float, optional
-      fuzzy operation 옵션
   tol_bbox : float, optional
       bounding box 허용 오차
   tol_cut : float, optional

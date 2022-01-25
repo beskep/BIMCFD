@@ -3,7 +3,7 @@ import re
 from collections import namedtuple
 from typing import Tuple
 
-from utils import DIR
+from utils import DIR, excepts
 
 import pandas as pd
 from fuzzywuzzy import fuzz
@@ -22,26 +22,16 @@ Friction = namedtuple('Friction',
 def load_kor_eng(path):
   with open(path, 'r', encoding='utf-8-sig') as f:
     kor_eng = json.load(f)
+
   return kor_eng
 
 
-def match_insulation(material, prop):
-  if prop not in ['rho', 'Cp', 'k']:
-    raise ValueError
-
-  if prop == 'rho':
-    fn = insulation.rho_material
-  elif prop == 'Cp':
-    fn = insulation.Cp_material
-  else:
-    fn = insulation.k_material
-
-  try:
-    res = fn(material)
-  except ValueError:
-    res = None
-
-  return res
+def match_insulation(material):
+  return {
+      'rho': excepts(ValueError, insulation.rho_material)(material),
+      'Cp': excepts(ValueError, insulation.Cp_material)(material),
+      'k': excepts(ValueError, insulation.k_material)(material)
+  }
 
 
 class MaterialMatch:
@@ -141,7 +131,7 @@ class MaterialMatch:
                                       scorer=self._scorer)
 
     if score_ht >= score_db:
-      prop = {x: match_insulation(nearest_ht, x) for x in ['rho', 'Cp', 'k']}
+      prop = match_insulation(nearest_ht)
       nearest_name = nearest_ht
     else:
       series = self._db.loc[self._db['Name'] == nearest_db, :].squeeze()  # pylint: disable=unsubscriptable-object

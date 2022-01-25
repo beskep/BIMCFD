@@ -67,14 +67,6 @@ class MaterialListItem(ThreeLineIconListItem):
   divider = None
 
 
-def _material_list_item(values):
-  return MaterialListItem(
-      text=values[0],
-      secondary_text=f'Conductivity: {values[1]:.3e} W/mK',
-      tertiary_text=f'Specific heat: {values[2]:.3e} J/kgK',
-  )
-
-
 class BimCfdAppBase(MDApp):
 
   def __init__(self, **kwargs):
@@ -101,7 +93,6 @@ class BimCfdAppBase(MDApp):
     self._save_dir = '\\'
 
     self._space_menu: DropDownMenu = None
-    # self._solver_menu: DropDownMenu = None
 
     self._spinner: MDSpinner = None
 
@@ -152,18 +143,6 @@ class BimCfdAppBase(MDApp):
   def save_dir_field(self) -> TextFieldPath:
     return self.root.ids.output_panel.ids.save_dir
 
-  # @property
-  # def visualize_button(self) -> MDRaisedButton:
-  #   return self.root.ids.file_panel.ids.visualize
-
-  # @property
-  # def simplify_button(self) -> MDRaisedButton:
-  #   return self.root.ids.simplification_panel.ids.simplify
-
-  # @property
-  # def execute_button(self) -> MDRaisedButton:
-  #   return self.root.ids.cfd_panel.ids.execute
-
   @property
   def spaces_menu(self) -> DropDownMenu:
     if self._space_menu is None:
@@ -171,8 +150,6 @@ class BimCfdAppBase(MDApp):
 
       def callback(*args, **kwargs):
         self._space_menu.select_item(*args, **kwargs)
-        # self.visualize_button.disabled = False
-        # self.simplify_button.disabled = False
 
       self._space_menu.menu.on_release = callback
 
@@ -362,6 +339,7 @@ class BimCfdAppBase(MDApp):
         'flag_external_zone':
             (self.root.ids.cfd_panel.ids.flag_external_zone.state == 'down'),
         'flag_interior_faces': simplfication_opt['flag_internal_faces'],
+        'flag_opening_volume': simplfication_opt['flag_opening_volume'],
         'flag_heat_flux': dialog_opt['flag_heat_flux'],
         'flag_friction': dialog_opt['flag_friction'],
         'external_temperature': dialog_opt['text_external_temperature'],

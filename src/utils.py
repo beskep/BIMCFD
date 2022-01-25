@@ -77,3 +77,46 @@ def set_logger(level: Union[int, str] = 20, handle_kivy_logger=False):
       kvlogger.addHandler(rich_handler)
     except ImportError:
       logger.error('kivy logger setting error')
+
+
+def return_none():
+  return None
+
+
+class excepts:
+  """A wrapper around a function to catch exceptions and
+  dispatch to a handler.
+  This is like a functional try/except block, in the same way that
+  ifexprs are functional if/else blocks.
+
+  Examples
+  --------
+  >>> excepting = excepts(
+  ...     ValueError,
+  ...     lambda a: [1, 2].index(a),
+  ...     lambda _: -1,
+  ... )
+  >>> excepting(1)
+  0
+  >>> excepting(3)
+  -1
+  Multiple exceptions and default except clause.
+  >>> excepting = excepts((IndexError, KeyError), lambda a: a[0])
+  >>> excepting([])
+  >>> excepting([1])
+  1
+  >>> excepting({})
+  >>> excepting({0: 1})
+  1
+  """
+
+  def __init__(self, exc, func, handler=return_none):
+    self.exc = exc
+    self.func = func
+    self.handler = handler
+
+  def __call__(self, *args, **kwargs):
+    try:
+      return self.func(*args, **kwargs)
+    except self.exc as e:
+      return self.handler(e)

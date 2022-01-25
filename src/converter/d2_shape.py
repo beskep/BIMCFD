@@ -50,6 +50,7 @@ class SamplingFace(Face):
     if self._srf is None or self.is_dirty:
       self._h_srf = BRep_Tool_Surface(self)
       self._srf = self._h_srf
+
     return self._srf
 
 
@@ -60,8 +61,10 @@ def d2_distribution(dist1: np.ndarray, dist2: np.ndarray, bins=None):
   if bins is None:
     bins = 'auto'
 
-  dist_range = (np.minimum(dist1.min(), dist2.min()),
-                np.maximum(dist1.max(), dist2.max()))  # yapf: disable
+  dist_range = (
+      np.minimum(dist1.min(), dist2.min()),
+      np.maximum(dist1.max(), dist2.max()),
+  )
 
   hist1, bin_edges = np.histogram(dist1,
                                   bins=bins,
@@ -112,6 +115,7 @@ def surface_sample(face, uv):
     return [gp_pnt.X(), gp_pnt.Y(), gp_pnt.Z()]
 
   points = np.array([np_point(x) for x in uv])
+
   return points
 
 
@@ -127,6 +131,7 @@ def surfaces_sample(faces, uv):
       if i in choice
   ]
   points = np.concatenate(points_list, axis=0)
+
   return points
 
 

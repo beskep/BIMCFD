@@ -26,7 +26,7 @@ def get_storey(entity):
 
 def get_bounded_by(space: IfcEntity):
   if not space.is_a('IfcSpace'):
-    raise ValueError('Need IfcSpace, not {}'.format(space.is_a()))
+    raise ValueError(f'Need IfcSpace, not {space.is_a()}')
 
   try:
     boundaries: Optional[list] = [

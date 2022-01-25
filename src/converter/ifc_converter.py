@@ -1,5 +1,6 @@
 import os
 from collections import defaultdict
+from dataclasses import dataclass
 from itertools import chain, combinations
 from pathlib import Path
 from shutil import copy2
@@ -19,6 +20,32 @@ from converter.openfoam_converter import OpenFoamConverter
 from converter.simplify import simplify_space
 
 
+@dataclass
+class BuildingShapes:
+  shape: TopoDS_Compound
+  space: TopoDS_Compound
+
+  wall_entities: List[IfcEntity]
+  wall_shapes: List[TopoDS_Shape]
+  wall_names: List[str]
+
+  opening_shapes: Optional[List[TopoDS_Shape]]
+  opening_names: Optional[List[str]] = None
+
+  def update_opening_names(self):
+    count = len(self.opening_shapes) if self.opening_shapes else 0
+    self.opening_names = [f'Opening_{x}' for x in range(count)]
+
+  def set_valid_walls(self, names):
+    indices = [i for i, x in enumerate(self.wall_names) if x in names]
+    if not indices:
+      raise ValueError('No valid walls')
+
+    self.wall_entities = [self.wall_entities[x] for x in indices]
+    self.wall_shapes = [self.wall_shapes[x] for x in indices]
+    self.wall_names = [self.wall_names[x] for x in indices]
+
+
 class IfcConverter:
 
   def __init__(self,
@@ -28,8 +55,8 @@ class IfcConverter:
                covering_types=('IfcCovering',)):
     self._file_path = os.path.normpath(path)
     self._ifc = ifcopenshell.open(self._file_path)
-    self._settings = ifcopenshell.geom.settings()
-    self._settings.set(self._settings.USE_PYTHON_OPENCASCADE, True)
+    self.__geom_settings = ifcopenshell.geom.settings()
+    self.__geom_settings.set(self.__geom_settings.USE_PYTHON_OPENCASCADE, True)
 
     self._ifc_types_wall = wall_types
     self._ifc_types_slab = slab_types
@@ -38,27 +65,9 @@ class IfcConverter:
 
     self._brep_deflection = (0.9, 0.5)
 
-    # Simplification options
-    self.threshold_internal_volume = 0.0  # TODO dataclass
-    self.threshold_internal_length = 0.0
-    self.threshold_surface_dist = 0.0
-    self.threshold_surface_angle = 0.0
-    self.threshold_surface_vol_ratio = 0.5
-    self.relative_threshold = True
-    self.preserve_opening = True
-    self.extract_opening_volume = True
-    self.fuzzy = 0.0
-
-    self.tol_bbox = 1e-8
-    self.tol_cut = 0.0
-
   @property
   def ifc(self) -> ifcopenshell.file:
     return self._ifc
-
-  @property
-  def settings(self):
-    return self._settings
 
   @property
   def file_path(self):
@@ -78,7 +87,7 @@ class IfcConverter:
       raise ValueError
 
   def create_geometry(self, entity: IfcEntity):
-    return ifcopenshell.geom.create_shape(self.settings, entity).geometry
+    return ifcopenshell.geom.create_shape(self.__geom_settings, entity).geometry
 
   def get_relating_space(
       self,
@@ -195,21 +204,13 @@ class IfcConverter:
 
     return shape, space, walls, openings
 
-  def simplify_space(self,
-                     spaces: Union[List[int], List[IfcEntity]],
-                     threshold_volume=None,
-                     threshold_dist=None,
-                     threshold_angle=None,
-                     fuzzy=0.0,
-                     relative_threshold=True,
-                     preserve_opening=True,
-                     opening_volume=True):
+  def _building_shapes(self, spaces: Union[List[int], List[IfcEntity]]):
     openings: Optional[List[TopoDS_Shape]]
     shape, space, walls, openings = self.convert_space(spaces)
-    wall_names = self.component_code(walls, 'W')
+    wall_names = self.component_code(walls, prefix='W')
 
     slabs = self.ifc.by_type('IfcSlab')
-    slab_names = self.component_code(slabs, 'S')
+    slab_names = self.component_code(slabs, prefix='S')
 
     walls.extend(slabs)
     wall_names.extend(slab_names)
@@ -230,31 +231,41 @@ class IfcConverter:
       wall_names = [wall_names[x] for x in valid_index]
       wall_shapes = [wall_shapes[x] for x in valid_index]
 
-    if not preserve_opening:
-      openings = None
+    return BuildingShapes(shape=shape,
+                          space=space,
+                          wall_entities=walls,
+                          wall_shapes=wall_shapes,
+                          wall_names=wall_names,
+                          opening_shapes=openings)
 
-    threshold_volume = threshold_volume or self.threshold_internal_volume
-    threshold_dist = threshold_dist or self.threshold_surface_dist
-    threshold_angle = threshold_angle or self.threshold_surface_angle
+  def simplify_space(self,
+                     spaces: Union[List[int], List[IfcEntity]],
+                     threshold_volume=0.0,
+                     threshold_dist=0.0,
+                     threshold_angle=0.0,
+                     relative_threshold=True,
+                     preserve_opening=True,
+                     opening_volume=True):
+    shapes = self._building_shapes(spaces=spaces)
+
+    if not preserve_opening:
+      shapes.opening_shapes = None
 
     if not any([threshold_volume, threshold_dist, threshold_angle]):
       logger.info('단순화 조건이 설정되지 않았습니다. 원본 형상을 저장합니다.')
-      simplified: Optional[TopoDS_Compound] = shape
-      fused: Optional[TopoDS_Compound] = shape
+      simplified: Optional[TopoDS_Compound] = shapes.shape
+      fused: Optional[TopoDS_Compound] = shapes.shape
       is_simplified = False
     else:
       try:
-        simplified = simplify_space(shape=shape,
-                                    openings=openings,
+        simplified = simplify_space(shape=shapes.shape,
+                                    openings=shapes.opening_shapes,
                                     brep_deflection=self.brep_deflection,
                                     threshold_internal_volume=threshold_volume,
                                     threshold_internal_length=0.0,
                                     threshold_surface_dist=threshold_dist,
                                     threshold_surface_angle=threshold_angle,
                                     relative_threshold=relative_threshold,
-                                    fuzzy=fuzzy,
-                                    tol_bbox=self.tol_bbox,
-                                    tol_cut=self.tol_cut,
                                     buffer_size=5.0)
         fused = geom_utils.fuse_compound(simplified)
       except RuntimeError as e:
@@ -264,20 +275,17 @@ class IfcConverter:
 
       is_simplified = (simplified is not None)
 
-    info_simplification = {
-        'threshold_volume': threshold_volume,
-        'threshold_distance': threshold_dist,
-        'threshold_angle': threshold_angle,
-        'fuzzy': fuzzy,
-        'relative_threshold': relative_threshold,
-        'preserve_opening': preserve_opening,
-        'extract_opening_volume': opening_volume,
-        'is_simplified': is_simplified
-    }
-
     info = {
-        'simplification': info_simplification,
-        'original_geometry': geom_utils.geometric_features(shape)
+        'simplification': {
+            'threshold_volume': threshold_volume,
+            'threshold_distance': threshold_dist,
+            'threshold_angle': threshold_angle,
+            'relative_threshold': relative_threshold,
+            'preserve_opening': preserve_opening,
+            'extract_opening_volume': opening_volume,
+            'is_simplified': is_simplified
+        },
+        'original_geometry': geom_utils.geometric_features(shapes.shape)
     }
     if is_simplified:
       info['simplified_geometry'] = geom_utils.geometric_features(simplified)
@@ -286,34 +294,31 @@ class IfcConverter:
       info['simplified_geometry'] = info['original_geometry']
       info['fused_geometry'] = info['original_geometry']
 
-    objcnv = ObjConverter(compound=(simplified if is_simplified else shape),
-                          space=space,
-                          openings=openings,
-                          walls=wall_shapes,
-                          wall_names=wall_names)
+    objcnv = ObjConverter(
+        compound=(simplified if is_simplified else shapes.shape),
+        space=shapes.space,
+        openings=shapes.opening_shapes,
+        walls=shapes.wall_shapes,
+        wall_names=shapes.wall_names)
     objcnv.classify_compound()
     objcnv.classify_opening(opening_volume=True)
     objcnv.classify_walls()
     valid_wall_names = objcnv.valid_surfaces()
-    if valid_wall_names:
-      indices = [i for i, x in enumerate(wall_names) if x in valid_wall_names]
-      assert indices, 'no valid wall indices'
-      walls = [walls[x] for x in indices]
-      wall_names = [wall_names[x] for x in indices]
-      wall_shapes = [wall_shapes[x] for x in indices]
 
-    opening_names = (['Opening_{}'.format(x) for x in range(len(openings))]
-                     if openings else [])
+    if valid_wall_names:
+      shapes.set_valid_walls(valid_wall_names)
+
+    shapes.update_opening_names()
     results = {
-        'original': shape,
+        'original': shapes.shape,
         'simplified': simplified,
         'fused': fused,
-        'space': space,
-        'walls': walls,
-        'wall_shapes': wall_shapes,
-        'wall_names': wall_names,
-        'openings': openings,
-        'opening_names': opening_names,
+        'space': shapes.space,
+        'walls': shapes.wall_entities,
+        'wall_shapes': shapes.wall_shapes,
+        'wall_names': shapes.wall_names,
+        'openings': shapes.opening_shapes,
+        'opening_names': shapes.opening_names,
         'info': info
     }
 
@@ -397,7 +402,7 @@ class IfcConverter:
                 deflection=self.brep_deflection,
                 additional_faces=zone_faces,
                 extract_interior=False,
-                extract_opening_volume=self.extract_opening_volume)
+                extract_opening_volume=options['flag_opening_volume'])
 
     # geometry 폴더에 저장된 obj 파일을 OpenFOAM 케이스 폴더 가장 바깥에 복사
     if flag_external_zone:

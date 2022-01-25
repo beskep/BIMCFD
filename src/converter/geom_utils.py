@@ -52,11 +52,11 @@ def common_volume(shape1, shape2):
   common = BRepAlgoAPI_Common(shape1, shape2).Shape()
 
   if common is None:
-    res = 0.0
+    vol = 0.0
   else:
-    res = GpropsFromShape(common).volume().Mass()
+    vol = GpropsFromShape(common).volume().Mass()
 
-  return res
+  return vol
 
 
 def fix_shape(shape: TopoDS_Shape, precision=None):
@@ -137,17 +137,17 @@ def maker_volume(shapes: Collection,
 
   mv.SetArguments(ls)
   mv.Perform()
-  result = fix_shape(mv.Shape())
+  volume = fix_shape(mv.Shape())
 
   if boundary is not None:
-    solids = list(TopologyExplorer(result).solids())
+    solids = list(TopologyExplorer(volume).solids())
     is_in = [
         _is_in(boundary, GpropsFromShape(x).volume().CentreOfMass(), on=False)
         for x in solids
     ]
-    result = compound([s for s, i in zip(solids, is_in) if i])
+    volume = compound([s for s, i in zip(solids, is_in) if i])
 
-  return result
+  return volume
 
 
 def _is_in(solid, pnt: gp_Pnt, tol=0.001, on=True) -> bool:
@@ -397,7 +397,7 @@ def split_by_faces(shape: TopoDS_Shape,
       splitter.AddTool(face)
 
     splitter.Perform()
-    result = splitter.Shape()
+    split = splitter.Shape()
   else:
     it = tqdm(faces) if verbose else faces
 
@@ -408,9 +408,9 @@ def split_by_faces(shape: TopoDS_Shape,
       shape = splitter.Shape()
       splitter.Clear()
 
-    result = shape
+    split = shape
 
-  return result  # type: ignore
+  return split  # type: ignore
 
 
 def sew_faces(shape: TopoDS_Shape, tol=1e-3) -> TopoDS_Solid:
@@ -443,9 +443,9 @@ def fuse_compound(target: Union[List, TopoDS_Shape]):
     target = list(TopologyExplorer(target).solids())
 
   if not target:
-    result = None
+    compound = None
   elif len(target) == 1:
-    result = target[0]
+    compound = target[0]
   else:
     fuse = BRepAlgoAPI_Fuse()
     arguments = TopTools_ListOfShape()
@@ -461,9 +461,9 @@ def fuse_compound(target: Union[List, TopoDS_Shape]):
     fuse.SetRunParallel(True)
     fuse.Build()
 
-    result = fuse.Shape() if fuse.IsDone() else None
+    compound = fuse.Shape() if fuse.IsDone() else None
 
-  return result
+  return compound
 
 
 def geometric_features(shape: TopoDS_Shape):
@@ -698,6 +698,6 @@ def outer_components(shape, target='face', hash_upper=1e8):
   else:
     it = exp.edges()
 
-  res = [x for x in it if comp_solid[x.HashCode(hash_upper)] == 1]
+  components = [x for x in it if comp_solid[x.HashCode(hash_upper)] == 1]
 
-  return res
+  return components

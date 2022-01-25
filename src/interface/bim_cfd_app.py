@@ -20,11 +20,10 @@ from interface.widgets.drop_down import DropDownMenu
 
 
 def _itc(geom_info: dict):
-  itc = (3.0 / geom_info['face_count'] + 6.0 / geom_info['edge_count'])
+  itc: float = (3.0 / geom_info['face_count'] + 6.0 / geom_info['edge_count'])
   itc = min(1.0, itc)
-  itc = '{:.2e}'.format(itc)
 
-  return itc
+  return f'{itc:.2e}'
 
 
 def _fmt(value, fmt='.2f'):
@@ -38,9 +37,7 @@ class IfcEntityText:
   @classmethod
   def menu_text(cls, index: int, name, width: int = None):
     fmt = '' if width is None else '0{}'.format(width)
-    text = cls.text_format.format(index, name, fmt=fmt)
-
-    return text
+    return cls.text_format.format(index, name, fmt=fmt)
 
   @classmethod
   def index(cls, text: str):
@@ -48,9 +45,7 @@ class IfcEntityText:
     if match is None:
       raise ValueError('Index Error')
 
-    index = int(match.group(1))
-
-    return index
+    return int(match.group(1))
 
 
 class BimCfdApp(BimCfdAppBase):
