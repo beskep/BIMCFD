@@ -46,17 +46,6 @@ _SOLVER_PATH = {x.lower(): utils.DIR.TEMPLATE.joinpath(x) for x in _SOLVERS}
 for x in _SOLVER_PATH.values():
   assert x.exists(), x
 
-# _MESH_SH = (b'surfaceFeatureEdges -angle 0 geometry.obj geometry.fms\n'
-#             b'cartesianMesh\n'
-#             b'checkMesh | tee log.mesh\n'
-#             b'decomposePar -force')
-
-# _RUN_SH = b'%s | tee log.run\nfoamLog log.run'
-# _PARALLEL_RUN_SH = (b'mpirun -np %s %s -parallel | tee log.run\n'
-#                     b'reconstructPar\n'
-#                     b'postProcess -func "mag(U)"\n'
-#                     b'foamLog log.run')
-
 
 class _Shell:
   RUN = b'%s | tee log.run\nfoamLog log.run'

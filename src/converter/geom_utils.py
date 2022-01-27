@@ -2,7 +2,7 @@ from collections import OrderedDict, defaultdict
 from collections.abc import Collection
 from itertools import chain
 from pathlib import Path
-from typing import List, Optional, Tuple, Union, no_type_check
+from typing import List, Optional, Tuple, Union
 
 import numpy as np
 from OCC.Core.Bnd import Bnd_Box
@@ -71,7 +71,7 @@ def fix_shape(shape: TopoDS_Shape, precision=None):
   return fix.Shape()
 
 
-def _maker_volume_sequential_helper(shape, plane, fuzzy):
+def _maker_volume_sequential_helper(shape, plane, fuzzy=0.0):
   mv = BOPAlgo_MakerVolume()
   mv.SetRunParallel(True)
 
@@ -140,11 +140,10 @@ def maker_volume(shapes: Collection,
   volume = fix_shape(mv.Shape())
 
   if boundary is not None:
-    solids = list(TopologyExplorer(volume).solids())
-    is_in = [
-        _is_in(boundary, GpropsFromShape(x).volume().CentreOfMass(), on=False)
-        for x in solids
-    ]
+    solids = TopologyExplorer(volume).solids()
+    is_in = (_is_in(boundary,
+                    GpropsFromShape(x).volume().CentreOfMass(),
+                    on=False) for x in solids)
     volume = compound([s for s, i in zip(solids, is_in) if i])
 
   return volume
@@ -315,8 +314,11 @@ def get_faces_vertices(faces: List[TopoDS_Face]) -> List[List[gp_Pnt]]:
   return vertices
 
 
-@no_type_check
-def planes_from_faces(faces: List[TopoDS_Shape]) -> List[Geom_Plane]:
+def plane_from_face(face: TopoDS_Shape) -> Geom_Plane:
+  return Geom_Plane.DownCast(BRep_Tool_Surface(face))  # type: ignore
+
+
+def planes_from_faces(faces: List[TopoDS_Shape]):
   """
   각 face를 포함하는 plane 반환
 
@@ -327,12 +329,9 @@ def planes_from_faces(faces: List[TopoDS_Shape]) -> List[Geom_Plane]:
 
   Returns
   -------
-  List[Geom_Plane]
+  Generator[Geom_Plane, None, None]
   """
-  surfaces = [BRep_Tool_Surface(face) for face in faces]
-  planes = [Geom_Plane.DownCast(surface) for surface in surfaces]
-
-  return planes
+  return (plane_from_face(x) for x in faces)
 
 
 def split_by_own_faces(shape: TopoDS_Shape, face_range=1000.0):
@@ -590,7 +589,7 @@ def align_model(shape: TopoDS_Shape) -> Optional[TopoDS_Shape]:
       [GpropsFromShape(x).surface().Mass() for x in faces])
 
   for face in (faces[x] for x in area_argsort[::-1]):
-    plane = planes_from_faces([face])[0]
+    plane = plane_from_face(face)
     if plane is None:
       continue
 

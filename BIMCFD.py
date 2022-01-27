@@ -13,7 +13,11 @@ if __name__ == '__main__':
 
   parser = argparse.ArgumentParser()
 
-  parser.add_argument('-l', help='log level', type=int, default=20)
+  parser.add_argument('-l',
+                      '--loglevel',
+                      help='log level',
+                      type=int,
+                      default=20)
   parser.add_argument('-d',
                       '--debug',
                       help='debug logging',
@@ -21,15 +25,13 @@ if __name__ == '__main__':
 
   group = parser.add_mutually_exclusive_group()
   group.add_argument('--loguru',
-                     action='store_const',
+                     action='store_true',
                      dest='handle_kivy_logger',
-                     help='loguru handles kivy log',
-                     const=True)
+                     help='loguru handles kivy log')
   group.add_argument('--kivy',
-                     action='store_const',
+                     action='store_false',
                      dest='handle_kivy_logger',
-                     help='kivy handles it\'s log',
-                     const=False)
+                     help='kivy handles it\'s log')
   parser.set_defaults(handle_kivy_logger=True)
 
   args = parser.parse_args()

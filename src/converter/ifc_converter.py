@@ -4,7 +4,7 @@ from dataclasses import dataclass
 from itertools import chain, combinations
 from pathlib import Path
 from shutil import copy2
-from typing import Iterable, List, Optional, Tuple, Union
+from typing import Any, Generator, Iterable, List, Optional, Tuple, Union
 
 import ifcopenshell
 import ifcopenshell.geom
@@ -51,8 +51,7 @@ class IfcConverter:
   def __init__(self,
                path: str,
                wall_types=('IfcWall',),
-               slab_types=('IfcSlab',),
-               covering_types=('IfcCovering',)):
+               slab_types=('IfcSlab',)):
     self._file_path = os.path.normpath(path)
     self._ifc = ifcopenshell.open(self._file_path)
     self.__geom_settings = ifcopenshell.geom.settings()
@@ -60,7 +59,6 @@ class IfcConverter:
 
     self._ifc_types_wall = wall_types
     self._ifc_types_slab = slab_types
-    self._ifc_types_covering = covering_types
     self._storeys = None
 
     self._brep_deflection = (0.9, 0.5)
@@ -82,24 +80,25 @@ class IfcConverter:
     if isinstance(value, (int, float)):
       self._brep_deflection = (value, 0.5)
     elif isinstance(value, Iterable):
-      self._brep_deflection = value
+      self._brep_deflection = tuple(value)
     else:
-      raise ValueError
+      raise TypeError
 
-  def create_geometry(self, entity: IfcEntity):
+  def create_geometry(self, entity: IfcEntity) -> TopoDS_Shape:
     return ifcopenshell.geom.create_shape(self.__geom_settings, entity).geometry
+
+  def _get_entities(self, types: Iterable[str]):
+    return chain.from_iterable((self.ifc.by_type(x) for x in types))
 
   def get_relating_space(
       self,
       target: Union[int, IfcEntity],
-  ) -> List[IfcEntity]:
+  ) -> Generator[IfcEntity, None, None]:
     if isinstance(target, int):
       target = self._ifc.by_id(target)
 
-    provides_boundaries = target.ProvidesBoundaries
-    relating_space = [pb.RelatingSpace for pb in provides_boundaries]
-
-    return relating_space
+    for pb in target.ProvidesBoundaries:
+      yield pb.RelatingSpace
 
   def get_space_wall_dict(self) -> defaultdict:
     """
@@ -110,10 +109,7 @@ class IfcConverter:
     """
     spaces_walls = defaultdict(set)
 
-    walls = list(
-        chain.from_iterable(
-            [self._ifc.by_type(x) for x in self._ifc_types_wall]))
-
+    walls = self._get_entities(self._ifc_types_wall)
     for wall in walls:
       spaces = self.get_relating_space(wall)
       for space in spaces:
@@ -144,16 +140,12 @@ class IfcConverter:
   def get_openings(self, wall: IfcEntity):
     assert any(wall.is_a(x) for x in self._ifc_types_wall)
 
-    shapes = []
     for opening in wall.HasOpenings:
       try:
-        shape = self.create_geometry(opening.RelatedOpeningElement)
-        shapes.append(shape)
+        yield self.create_geometry(opening.RelatedOpeningElement)
       except RuntimeError:
         logger.exception('Opening 추출 실패: {}, {}', self.file_path,
                          opening.RelatedOpeningElement)
-
-    return shapes
 
   def convert_space(
       self,
@@ -171,7 +163,7 @@ class IfcConverter:
         set(chain.from_iterable([self.get_openings(w) for w in walls])))
 
     if len(targets) == 1 and not openings:
-      shape = self.create_geometry(targets[0])
+      shape: Any = self.create_geometry(targets[0])
       space = shape
     else:
       shape = TopoDS_Compound()
@@ -209,7 +201,7 @@ class IfcConverter:
     shape, space, walls, openings = self.convert_space(spaces)
     wall_names = self.component_code(walls, prefix='W')
 
-    slabs = self.ifc.by_type('IfcSlab')
+    slabs = list(self._get_entities(self._ifc_types_slab))
     slab_names = self.component_code(slabs, prefix='S')
 
     walls.extend(slabs)

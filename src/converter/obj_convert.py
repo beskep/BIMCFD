@@ -4,7 +4,7 @@ from collections import defaultdict
 from itertools import chain
 from pathlib import Path
 from tempfile import TemporaryDirectory
-from typing import Collection, List, Optional, Union
+from typing import Collection, Optional, Union
 
 from utils import DIR
 
@@ -12,7 +12,7 @@ import numpy as np
 from loguru import logger
 from OCC.Core.BRepAlgo import BRepAlgo_Common
 from OCC.Core.BRepBuilderAPI import BRepBuilderAPI_MakeVertex
-from OCC.Core.TopoDS import TopoDS_Compound, TopoDS_Face, TopoDS_Shape
+from OCC.Core.TopoDS import TopoDS_Compound, TopoDS_Shape
 from OCC.Extend.DataExchange import write_stl_file
 from OCC.Extend.TopologyUtils import TopologyExplorer
 
@@ -28,21 +28,6 @@ EMPTY_BLEND_PATH = DIR.RESOURCE.joinpath('misc/empty.blend')
 BLENDER_SCRIPT_PATH = DIR.RESOURCE.joinpath('misc/blender.py')
 EMPTY_BLEND_PATH.stat()
 BLENDER_SCRIPT_PATH.stat()
-
-
-class _FaceInfo:
-
-  def __init__(self, areas: np.ndarray, norms: np.ndarray,
-               center: np.ndarray) -> None:
-    self.areas = areas
-    self.norms = norms
-    self.center = center
-
-
-def _face_info(faces: List[TopoDS_Face]):
-  areas, norms, _, center, _ = face_info(faces)
-
-  return _FaceInfo(areas=areas, norms=norms, center=center)
 
 
 def find_blender_path(path=None):
@@ -212,11 +197,11 @@ class ObjConverter:
   def _classify_opening_interior(self, op, surf, surface_closest_opening,
                                  surface_opening_idx, tol):
     # interior 중 opening에 해당하는 면 추출
-    intr = _face_info(self._obj_interior)
+    intr = face_info(self._obj_interior)
     intr_opening_mask = is_same_face(faces1=self._obj_opening,
-                                     norm1=op.norms,
+                                     norm1=op.norm,
                                      center1=op.center,
-                                     norm2=intr.norms,
+                                     norm2=intr.norm,
                                      center2=intr.center,
                                      tol=tol)
 
@@ -237,11 +222,11 @@ class ObjConverter:
 
     # 표면(벽) 중 opening 부피와 일치하는 표면 제거
     opvol_faces = list(chain.from_iterable(self._op_faces))
-    opvol = _face_info(opvol_faces)
+    opvol = face_info(opvol_faces)
     surface_opening_vol_mask = is_same_face(faces1=opvol_faces,
-                                            norm1=opvol.norms,
+                                            norm1=opvol.norm,
                                             center1=opvol.center,
-                                            norm2=surf.norms,
+                                            norm2=surf.norm,
                                             center2=surf.center,
                                             tol=tol)
     surface_opening_vol_idx = np.argwhere(
@@ -265,14 +250,14 @@ class ObjConverter:
       return
 
     # surface 중 opening face 제거
-    op = _face_info(self._obj_opening)
-    surf = _face_info(self._obj_surface)
+    op = face_info(self._obj_opening)
+    surf = face_info(self._obj_surface)
 
     # 표면(벽), 중 opening에 해당하는 면 추출
     surface_opening_mask = is_same_face(faces1=self._obj_opening,
-                                        norm1=op.norms,
+                                        norm1=op.norm,
                                         center1=op.center,
-                                        norm2=surf.norms,
+                                        norm2=surf.norm,
                                         center2=surf.center,
                                         tol=tol)
 

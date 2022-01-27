@@ -411,9 +411,8 @@ class OpenFoamConverter:
     ffs = [x for x in case.foam_files if x.location == '"0"']
 
     if target_fields:
-      invalid_fields = [
-          x for x in target_fields if x not in [x.name for x in ffs]
-      ]
+      names = set(x.names for x in ffs)
+      invalid_fields = [x for x in target_fields if x not in names]
       if invalid_fields:
         raise ValueError(f'Invalid target boundary fields: {invalid_fields}')
 

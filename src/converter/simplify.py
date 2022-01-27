@@ -1,8 +1,7 @@
 from collections.abc import Iterable
+from dataclasses import dataclass
 from itertools import chain
 from typing import List, Optional, Tuple, Union
-
-import utils
 
 import numpy as np
 from OCC.Core.BRepAlgoAPI import BRepAlgoAPI_Cut
@@ -18,6 +17,15 @@ from OCCUtils.Construct import compound, make_plane
 from OCCUtils.face import Face
 
 from converter import geom_utils
+
+
+@dataclass
+class FaceInfo:
+  area: np.ndarray
+  norm: np.ndarray
+  norm_gp: List[gp_Vec]
+  center: np.ndarray
+  center_gp: List[gp_Pnt]
 
 
 def flat_face_info(faces: List[TopoDS_Face]):
@@ -50,7 +58,11 @@ def flat_face_info(faces: List[TopoDS_Face]):
     norms = np.empty((0, 3))
     center = np.empty((0, 3))
 
-  return areas, norms, norm_gp_vec, center, center_gp_pnts
+  return FaceInfo(area=areas,
+                  norm=norms,
+                  norm_gp=norm_gp_vec,
+                  center=center,
+                  center_gp=center_gp_pnts)
 
 
 def curved_face_info(faces: List[TopoDS_Face]):
@@ -84,11 +96,15 @@ def curved_face_info(faces: List[TopoDS_Face]):
     norms = np.empty((0, 3))
     center = np.empty((0, 3))
 
-  return areas, norms, norm_gp_vec, center, center_gp_pnts
+  return FaceInfo(area=areas,
+                  norm=norms,
+                  norm_gp=norm_gp_vec,
+                  center=center,
+                  center_gp=center_gp_pnts)
 
 
 def face_info(faces: List[TopoDS_Face]):
-  planes = geom_utils.planes_from_faces(faces)
+  planes = tuple(geom_utils.planes_from_faces(faces))
 
   if any(plane is None for plane in planes):
     # 곡면이 존재하는 경우
@@ -97,26 +113,26 @@ def face_info(faces: List[TopoDS_Face]):
     flat_faces = [faces[i] for i in range(len(faces)) if i not in curved_idx]
 
     # 평면 정보 추출
-    areas, norms, norm_gp, center, center_gp = flat_face_info(flat_faces)
+    fi = flat_face_info(flat_faces)
 
     # 곡면 정보 추출
-    ca, cn, cngp, cc, ccgp = curved_face_info(curved_faces)
+    cfi = curved_face_info(curved_faces)
 
     # 평면 정보에 곡면 정보를 덧붙임
-    areas = np.append(areas, ca)
-    norms = np.vstack([norms, cn])
-    norm_gp.extend(cngp)
-    center = np.vstack([center, cc])
-    center_gp.extend(ccgp)
-    faces_count = areas.shape[0]
+    fi.area = np.append(fi.area, cfi.area)
+    fi.norm = np.vstack([fi.norm, cfi.norm])
+    fi.norm_gp.extend(cfi.norm_gp)
+    fi.center = np.vstack([fi.center, cfi.center])
+    fi.center_gp.extend(cfi.center_gp)
 
-    assert faces_count == norms.shape[0]
-    assert faces_count == center.shape[0]
+    faces_count = fi.area.shape[0]
+    assert faces_count == fi.norm.shape[0]
+    assert faces_count == fi.center.shape[0]
   else:
     # 평면만 존재하는 경우
-    areas, norms, norm_gp, center, center_gp = flat_face_info(faces)
+    fi = flat_face_info(faces)
 
-  return areas, norms, norm_gp, center, center_gp
+  return fi
 
 
 def classify_minor_faces(area: np.ndarray,
@@ -166,30 +182,29 @@ def classify_minor_faces(area: np.ndarray,
         set(
             chain.from_iterable(
                 [TopologyExplorer(opening).faces() for opening in openings])))
-    op_area, op_norm, _, op_center, _ = face_info(opening_faces)
-
-    op_norm = op_norm / np.linalg.norm(op_norm, axis=1).reshape([-1, 1])
+    op = face_info(opening_faces)
+    op.norm = op.norm / np.linalg.norm(op.norm, axis=1).reshape([-1, 1])
 
     # 두 face가 평행한지 (법선 내적이 1인지) 확인
-    norm_ = np.repeat(norm, op_norm.shape[0], axis=0)
-    norm_ = norm_.reshape([norm.shape[0], op_norm.shape[0], 3])
-    op_norm_ = np.tile(op_norm, (norm.shape[0], 1))
-    op_norm_ = op_norm_.reshape([norm.shape[0], op_norm.shape[0], 3])
+    norm_ = np.repeat(norm, op.norm.shape[0], axis=0)
+    norm_ = norm_.reshape([norm.shape[0], op.norm.shape[0], 3])
+    op_norm_ = np.tile(op.norm, (norm.shape[0], 1))
+    op_norm_ = op_norm_.reshape([norm.shape[0], op.norm.shape[0], 3])
     is_parallel = np.isclose(np.abs(np.sum(norm_ * op_norm_, axis=2)), 1.0)
 
     # 두 face가 동일 평면에 존재하는지 (중앙점 간 벡터와 법선의 내적 0) 확인
-    center_ = np.repeat(center, op_center.shape[0], axis=0)
-    center_ = center_.reshape([center.shape[0], op_center.shape[0], 3])
-    op_center_ = np.tile(op_center, (center.shape[0], 1))
-    op_center_ = op_center_.reshape([center.shape[0], op_center.shape[0], 3])
+    center_ = np.repeat(center, op.center.shape[0], axis=0)
+    center_ = center_.reshape([center.shape[0], op.center.shape[0], 3])
+    op_center_ = np.tile(op.center, (center.shape[0], 1))
+    op_center_ = op_center_.reshape([center.shape[0], op.center.shape[0], 3])
     is_coplanar = np.isclose(np.sum(norm_ * (center_ - op_center_), axis=2),
                              0.0)
 
     # 두 face의 면적이 동일한지 확인
-    area_ = np.repeat(area, op_area.shape[0], axis=0)
-    area_ = area_.reshape([area.shape[0], op_area.shape[0]])
-    op_area_ = np.tile(op_area, area.shape[0])
-    op_area_ = op_area_.reshape([area.shape[0], op_area.shape[0]])
+    area_ = np.repeat(area, op.area.shape[0], axis=0)
+    area_ = area_.reshape([area.shape[0], op.area.shape[0]])
+    op_area_ = np.tile(op.area, area.shape[0])
+    op_area_ = op_area_.reshape([area.shape[0], op.area.shape[0]])
     is_same_area = np.isclose(area_, op_area_)
 
     # 세 기준 모두 일치하는 face를 opening face로 판단
@@ -453,12 +468,12 @@ def merge_minor_faces(
 
   # shape의 모든 face 추출
   faces = list(TopologyExplorer(shape).faces())
-  area, norm, norm_gp, center, center_gp = face_info(faces)
+  fi = face_info(faces)
 
   # buffer를 split하지 않는 (=생략되는) face
-  minor_faces = classify_minor_faces(area=area,
-                                     center=center,
-                                     norm=norm,
+  minor_faces = classify_minor_faces(area=fi.area,
+                                     center=fi.center,
+                                     norm=fi.norm,
                                      threshold_dist=threshold_dist,
                                      threshold_cos=threshold_cos,
                                      openings=openings)
@@ -479,8 +494,8 @@ def merge_minor_faces(
     extent = buffer_size * np.max(np.abs(bbox_pnts[0] - bbox_pnts[1]))
 
     # buffer를 split하는데 사용될 face들
-    major_faces = [x for x in range(area.shape[0]) if x not in minor_faces]
-    major_planes = [(center_gp[i], norm_gp[i]) for i in major_faces]
+    major_faces = [x for x in range(fi.area.shape[0]) if x not in minor_faces]
+    major_planes = [(fi.center_gp[i], fi.norm_gp[i]) for i in major_faces]
     major_planes = [
         make_plane(c, v, -extent, extent, -extent, extent)
         for c, v in major_planes
