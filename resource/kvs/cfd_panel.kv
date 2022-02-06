@@ -28,6 +28,14 @@
                         active: False
 
                 MDBoxLayout:
+                    MDLabel:
+                        text: '풍환경 옵션'
+
+                    MDRaisedButton:
+                        text: '설정'
+                        on_release: app.external_dialog.open()
+
+                MDBoxLayout:
                     orientation: 'horizontal'
 
                     MDLabel:

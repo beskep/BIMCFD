@@ -1,8 +1,6 @@
 import threading
 from pathlib import Path
 
-import utils
-
 from kivy.clock import mainthread
 from kivy.metrics import dp
 from kivy.uix.widget import Widget, WidgetException
@@ -20,7 +18,8 @@ from kivymd.uix.list import ThreeLineIconListItem
 from kivymd.uix.snackbar import Snackbar
 from kivymd.uix.spinner import MDSpinner
 
-from .widgets.cfd_setting import CfdSettingDialog
+from .widgets.cfd_setting import (CfdSettingContent, CfdSettingDialog,
+                                  ExternalSettingContent)
 from .widgets.drop_down import DropDownMenu
 from .widgets.panel_title import PanelTitle
 from .widgets.text_field import TextFieldPath, TextFieldUnit
@@ -63,10 +62,6 @@ class SimplificationContent(MDBoxLayout):
   pass
 
 
-class MaterialListItem(ThreeLineIconListItem):
-  divider = None
-
-
 class BimCfdAppBase(MDApp):
 
   def __init__(self, **kwargs):
@@ -101,9 +96,8 @@ class BimCfdAppBase(MDApp):
     self._snackbar.font_size = dp(16)
 
     self._cfd_dialog = None
-    self._cfd_options = None
+    self._external_dialog = None
     self._simpl_dialog = None
-    self._material_dialog = None
 
   def build(self):
     return BimCfdWidget()
@@ -181,9 +175,18 @@ class BimCfdAppBase(MDApp):
   @property
   def cfd_dialog(self) -> CfdSettingDialog:
     if self._cfd_dialog is None:
-      self._cfd_dialog = CfdSettingDialog()
+      self._cfd_dialog = CfdSettingDialog(title='CFD 세부 설정',
+                                          content_cls=CfdSettingContent)
 
     return self._cfd_dialog
+
+  @property
+  def external_dialog(self) -> CfdSettingDialog:
+    if self._external_dialog is None:
+      self._external_dialog = CfdSettingDialog(
+          title='풍환경 설정', content_cls=ExternalSettingContent)
+
+    return self._external_dialog
 
   @property
   def vis_layout(self) -> MDBoxLayout:
@@ -334,6 +337,7 @@ class BimCfdAppBase(MDApp):
     simplfication_opt = self.get_simplification_options()
 
     dialog_opt = self.cfd_dialog.options
+    dialog_opt.update(self.external_dialog.options)
     ofopt = {
         'solver': 'simpleFoam',
         'flag_external_zone':
@@ -418,6 +422,7 @@ class BimCfdAppBase(MDApp):
     self.material_table_layout.add_widget(data_table)
 
   def open_simplification_dialog(self):
+    # XXX messy
     if self._simpl_dialog is None:
       ok_btn = MDRaisedButton(text='확인')
       self._simpl_dialog = MDDialog(title='건물 형상 최적화 설정',
