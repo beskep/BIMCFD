@@ -5,7 +5,7 @@ from collections import defaultdict
 from itertools import chain
 from pathlib import Path
 from tempfile import TemporaryDirectory
-from typing import Collection, Iterable, Union
+from typing import Collection, Iterable, Optional, Union
 
 import utils
 
@@ -472,3 +472,25 @@ def write_obj(compound: TopoDS_Compound,
                           deflection=deflection)
 
   return converter.valid_surfaces()
+
+
+def write_obj_from_dict(faces: dict,
+                        obj_path,
+                        blender_path: Optional[Union[str, Path]] = None,
+                        deflection=(0.9, 0.5)):
+  with TemporaryDirectory() as temp_dir:
+    td = Path(temp_dir)
+    paths = []
+
+    for name, fs in faces.items():
+      shape = fs[0] if len(fs) == 1 else compound(fs)
+      path = td.joinpath(f'{name}.stl')
+      write_stl_file(shape,
+                     filename=path.as_posix(),
+                     linear_deflection=deflection[0],
+                     angular_deflection=deflection[1])
+      paths.append(path)
+
+    stl_to_obj(obj_path, blender_path, *paths)
+
+  fix_surface_name(obj_path)

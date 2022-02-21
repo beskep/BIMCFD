@@ -15,7 +15,7 @@ from OCC.Extend import DataExchange
 
 from converter import geom_utils
 from converter.material_match import MaterialMatch
-from converter.obj_convert import ObjConverter, write_obj
+from converter.obj_convert import ObjConverter, write_obj, write_obj_from_dict
 from converter.openfoam import BoundaryFieldDict, OpenFoamCase
 from converter.simplify import simplify_space
 
@@ -935,17 +935,10 @@ class IfcConverter:
       _, zone_faces = geom_utils.make_external_zone(
           shape, buffer_size=opt['external_zone_size'])
 
-      write_obj(compound=shape,
-                space=simplified['space'],
-                openings=simplified['openings'],
-                walls=[self.create_geometry(x) for x in simplified['walls']],
-                wall_names=simplified['wall_names'],
-                obj_path=os.path.join(working_dir, 'geometry',
-                                      'geometry_external.obj'),
-                deflection=self.brep_deflection,
-                additional_faces=zone_faces,
-                extract_interior=False,
-                extract_opening_volume=self.extract_opening_volume)
+      write_obj_from_dict(faces=zone_faces,
+                          obj_path=os.path.join(working_dir, 'geometry',
+                                                'geometry_external.obj'),
+                          deflection=self.brep_deflection)
 
     # geometry 폴더에 저장된 obj 파일을 OpenFOAM 케이스 폴더 가장 바깥에 복사
     if flag_external_zone:
