@@ -203,7 +203,7 @@ class BimCfdAppBase(MDApp):
   def open_file_manager(self, mode):
     if mode == 'bim':
       cur_dir = self._bim_path
-      ext = ['.ifc', '.IFC']
+      ext = ['.ifc', '.IFC', '.stl', '.STL', '.stp', '.STP', '.step', '.STEP']
       search = 'all'
     elif mode == 'save':
       cur_dir = self._save_dir

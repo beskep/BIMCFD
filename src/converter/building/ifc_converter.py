@@ -19,6 +19,8 @@ from converter.obj_convert import ObjConverter, write_obj, write_obj_from_dict
 from converter.openfoam_converter import OpenFoamConverter
 from converter.simplify import simplify_space
 
+from .converter import Converter
+
 
 @dataclass
 class BuildingShapes:
@@ -46,7 +48,7 @@ class BuildingShapes:
     self.wall_names = [self.wall_names[x] for x in indices]
 
 
-class IfcConverter:
+class IfcConverter(Converter):
 
   def __init__(self,
                path: str,
@@ -376,7 +378,8 @@ class IfcConverter:
     except RuntimeError as e:
       logger.error('obj 저장 실패: {}', e)
 
-  def _write_openfoam_object(self, options, simplified, working_dir: Path):
+  def _write_openfoam_object(self, options: dict, simplified: dict,
+                             working_dir: Path):
     flag_external_zone = (options['flag_external_zone'] and
                           options['external_zone_size'] > 1)
     if flag_external_zone:
@@ -404,47 +407,6 @@ class IfcConverter:
       copy2(src=geom_path, dst=os.path.join(working_dir, 'geometry.obj'))
     else:
       logger.warning('obj 추출에 실패했습니다.')
-
-  def openfoam_case(self,
-                    simplified,
-                    save_dir,
-                    case_name,
-                    options: Optional[dict] = None):
-    """OpenFOAM 케이스 생성 및 저장
-
-    Parameters
-    ----------
-    simplified : dict
-        simplification 결과
-    save_dir : PathLike
-        저장 경로
-    case_name : str
-        저장할 케이스 이름 (save_dir/case_name에 결과 저장)
-    options : Optional[dict], optional
-        options, by default None
-
-    Raises
-    ------
-    ValueError
-        OpenFOAM 설정 입력 오류
-    """
-    save_dir = Path(save_dir)
-    save_dir.stat()
-    working_dir = save_dir.joinpath(case_name)
-    working_dir.mkdir(exist_ok=True)
-
-    if (options and options['flag_external_zone'] and
-        options['external_zone_size'] > 1):
-      simplified['wall_names'] = ['0']
-
-    self._write_openfoam_object(options=options,
-                                simplified=simplified,
-                                working_dir=working_dir)
-
-    oc = OpenFoamConverter(options=options)
-    oc.write_openfoam_case(simplified=simplified,
-                           save_dir=save_dir,
-                           name=case_name)
 
   def component_code(self, entities, prefix, storey_prefix='F'):
     if self._storeys is None:

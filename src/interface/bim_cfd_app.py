@@ -1,6 +1,7 @@
 import os
 import re
 from pathlib import Path
+from typing import Optional
 
 from utils import DIR
 
@@ -8,8 +9,8 @@ from kivy.clock import mainthread
 from kivy.metrics import dp
 from loguru import logger
 
-from converter import ifc_converter as ifccnv
 from converter import openfoam
+from converter.building import CADConverter, Converter, IfcConverter
 from converter.ifc_utils import entity_name
 from converter.material_match import DB_PATH as MATERIAL_DB_PATH
 from converter.openfoam_converter import MaterialMatch
@@ -28,6 +29,22 @@ def _itc(geom_info: dict):
 
 def _fmt(value, fmt='.2f'):
   return '{:{}}'.format(value, fmt) if value else 'NA'
+
+
+def _grid_resolution(simplified: dict):
+  try:
+    cl = simplified['info']['original_geometry']['characteristic_length']
+  except KeyError:
+    cl = -1
+
+  if cl < 0.5:
+    gr = 8
+  elif cl < 0.7:
+    gr = 16
+  else:
+    gr = 24
+
+  return gr
 
 
 class IfcEntityText:
@@ -61,11 +78,10 @@ class BimCfdApp(BimCfdAppBase):
   def __init__(self, **kwargs):
     super().__init__(**kwargs)
 
-    self._converter: ifccnv.IfcConverter = None
-    self._spaces: list = None
-    self._target_space_id = None
-    self._simplified: dict = None
-    self._renderer: topo.TopoRenderer = None
+    self._converter: Optional[Converter] = None
+    self._spaces: Optional[list] = None
+    self._simplified: Optional[dict] = None
+    self._renderer: Optional[topo.TopoRenderer] = None
     self._space_menu = None
 
     # XXX 프리즈 발생할 경우 그래픽 관련 method mainthread로
@@ -74,13 +90,16 @@ class BimCfdApp(BimCfdAppBase):
     super().select_path(path)
 
     path = Path(path)
-    if self.file_manager.mode == 'bim' and path.suffix.lower() == '.ifc':
-      self.load_ifc(path)
+    if self.file_manager.mode == 'bim':
+      if path.suffix.lower() == '.ifc':
+        self.load_ifc(path)
+      else:
+        self.load_cad(path)
 
   @with_spinner
   def load_ifc(self, path: Path):
     try:
-      self._converter = ifccnv.IfcConverter(path=path.as_posix())
+      self._converter = IfcConverter(path=path.as_posix())
     except Exception:  # pylint: disable=broad-except
       self.show_snackbar('IFC 로드 실패')
       logger.exception('IFC 로드 실패')
@@ -96,6 +115,16 @@ class BimCfdApp(BimCfdAppBase):
       self._converter.brep_deflection = options['precision']
 
     self.show_snackbar('IFC 로드 완료', duration=1.0)
+
+  @with_spinner
+  def load_cad(self, path: Path):
+    try:
+      self._converter = CADConverter(path=path)
+    except Exception:  # pylint: disable=broad-except
+      self.show_snackbar('CAD 로드 실패')
+      logger.exception('CAD 로드 실패')
+    else:
+      self.show_snackbar('CAD 로드 완료', duration=1.0)
 
   @mainthread
   def update_ifc_spaces(self):
@@ -181,7 +210,7 @@ class BimCfdApp(BimCfdAppBase):
   @with_spinner
   def simplify_space(self):
     space = self.selected_space_entity()
-    if space is None:
+    if space is None and isinstance(self._converter, IfcConverter):
       return
 
     options = self.get_simplification_options()
@@ -210,14 +239,7 @@ class BimCfdApp(BimCfdAppBase):
     self._simplified = simplified
 
     # 해상도 설정
-    cl = simplified['info']['original_geometry']['characteristic_length']
-    if cl < 0.5:
-      grid_resolution = 8
-    elif cl < 0.7:
-      grid_resolution = 16
-    else:
-      grid_resolution = 24
-    self._set_grid_resolution(grid_resolution)
+    self._set_grid_resolution(_grid_resolution(simplified))
 
     self.show_simplification_results()
     # self.execute_button.disabled = False
@@ -288,6 +310,9 @@ class BimCfdApp(BimCfdAppBase):
       self.show_snackbar('형상 전처리 필요')
       return
 
+    if isinstance(self._converter, CADConverter):
+      return
+
     # TODO outer faces, edges 개수만 표시하기
     self.show_geom_info(simplified)
     self.show_material_info(simplified)
@@ -300,9 +325,10 @@ class BimCfdApp(BimCfdAppBase):
 
   @with_spinner
   def _execute_helper(self, simplified, save_dir: Path):
+    assert self._converter is not None
     assert simplified is not None
-    openfoam_options = self.get_openfoam_options()
 
+    openfoam_options = self.get_openfoam_options()
     geom_dir = save_dir.joinpath('BIMCFD', 'geometry')
     if not geom_dir.exists():
       geom_dir.mkdir(parents=True)

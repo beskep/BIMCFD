@@ -38,7 +38,7 @@ if __name__ == '__main__':
   level = 10 if args.debug else args.loglevel
   utils.set_logger(level=level, handle_kivy_logger=args.handle_kivy_logger)
 
-  from src.converter import ifc_converter, simplify
+  from src.converter import building, simplify
   from src.interface import bim_cfd_app, bim_cfd_base
   from src.OCCUtils import Common, Construct, edge, face
 

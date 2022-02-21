@@ -345,7 +345,7 @@ def planes_from_faces(faces: List[TopoDS_Shape]):
   return (plane_from_face(x) for x in faces)
 
 
-def face2plane(face: TopoDS_Face, extent=1000.0):
+def face2plane(face: TopoDS_Face, extent=1e8):
   face_util = Face(face)
   _, center = face_util.mid_point()
   norm = face_normal(face)
@@ -492,7 +492,7 @@ def geometric_features(shape: TopoDS_Shape):
   for solid in exp.solids():
     for face in TopologyExplorer(solid).faces():
       fs[face.HashCode(100000000)].append(solid)
-  surface_count = len([x for x in fs.values() if len(x) == 1])
+  surface_count = sum(1 for x in fs.values() if len(x) == 1)
 
   features = OrderedDict([
       ('volume', volume),
@@ -621,7 +621,7 @@ def make_external_zone(shape: TopoDS_Shape,
   tuple
       TopoDS_Shape, {face_name: TopoDS_Face}
   """
-  zone, bbox = _make_external_zone(shape=fuse_compound(shape),
+  zone, bbox = _make_external_zone(shape=fuse_compound(shape) or shape,
                                    buffer_size=buffer,
                                    vertical_dim=vertical_dim)
   shape2 = fuzzy_cut(zone, shape, tol=1e-2)

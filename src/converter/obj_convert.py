@@ -111,7 +111,7 @@ class ObjConverter:
                openings: Optional[Collection[TopoDS_Shape]] = None,
                walls: Optional[Collection[TopoDS_Shape]] = None,
                wall_names: Optional[Collection[str]] = None,
-               additional_faces: dict = None,
+               additional_faces: Optional[dict] = None,
                hash_upper=1e8):
     self._compound = compound
     self._space = space
@@ -161,15 +161,20 @@ class ObjConverter:
       for face in TopologyExplorer(solid).faces():
         face_solid[face.HashCode(int(self._hash_upper))].append(solid)
 
-    self._obj_interior = [
-        f for f, i in zip(self._comp_faces, self._comp_ids)
-        if len(face_solid[i]) > 1
-    ]
-
-    self._obj_surface = [
-        f for f, i in zip(self._comp_faces, self._comp_ids)
-        if len(face_solid[i]) == 1
-    ]
+    if not face_solid:
+      # 대상 형상에 solid가 존재하지 않으면
+      # (BIM이 아닌 stp, stl 파일을 읽은 경우)
+      # 모든 face를 surface로 판단
+      self._obj_surface = list(TopologyExplorer(self._compound).faces())
+    else:
+      self._obj_interior = [
+          f for f, i in zip(self._comp_faces, self._comp_ids)
+          if len(face_solid[i]) > 1
+      ]
+      self._obj_surface = [
+          f for f, i in zip(self._comp_faces, self._comp_ids)
+          if len(face_solid[i]) == 1
+      ]
 
   def _classify_opening_surfaces(self, opening_volume, tol):
     for faces in self._op_faces:
@@ -365,7 +370,7 @@ class ObjConverter:
                     blender_path,
                     tol,
                     extract_interior=True,
-                    deflection=(0.9, 1.0)):
+                    deflection=(0.9, 0.5)):
     if self._obj_surface is None:
       self.classify_opening()
       self.classify_walls(tol=tol)
@@ -447,12 +452,12 @@ def fix_surface_name(obj_path):
 
 def write_obj(compound: TopoDS_Compound,
               space: TopoDS_Shape,
-              openings: Optional[Collection[TopoDS_Shape]],
-              walls: Optional[Collection[TopoDS_Shape]],
-              obj_path: str,
-              deflection: float,
+              obj_path: Union[str, Path],
+              openings: Optional[Collection[TopoDS_Shape]] = None,
+              walls: Optional[Collection[TopoDS_Shape]] = None,
               wall_names: Optional[list] = None,
-              additional_faces: dict = None,
+              deflection=(0.9, 0.5),
+              additional_faces: Optional[dict] = None,
               blender_path: Optional[Union[str, Path]] = None,
               extract_interior=True,
               extract_opening_volume=False,
@@ -465,17 +470,17 @@ def write_obj(compound: TopoDS_Compound,
       단순화를 마친 compound
   space : TopoDS_Shape
       opening을 포함하지 않은 공간의 shape
+  obj_path : str
+      obj 파일 저장 경로
   openings : Optional[Collection[TopoDS_Shape]]
       대상 공간과 함께 추출하는 opening의 목록
   walls : Optional[Collection[TopoDS_Shape]]
       벽 목록 (슬라브 포함)
-  obj_path : str
-      obj 파일 저장 경로
-  deflection : float
-      deflection
   wall_names : Optional[list], optional
       추출할 벽 표면의 이름 리스트, by default None
-  additional_faces : dict, optional
+  deflection : tuple
+      deflection
+  additional_faces : Optional[dict], optional
       추가로 추출할 face dict {name: TopoDS_Face}, by default None
   blender_path : Optional[Union[str, Path]], optional
       blender가 설치된 경로, by default None
@@ -493,6 +498,8 @@ def write_obj(compound: TopoDS_Compound,
   Optional[list]
       Valid sourfaces list
   """
+  obj_path = Path(obj_path)
+
   converter = ObjConverter(compound=compound,
                            space=space,
                            openings=openings,
@@ -509,7 +516,9 @@ def write_obj(compound: TopoDS_Compound,
                           extract_interior=extract_interior,
                           deflection=deflection)
 
-  # TODO mtl 지우기
+  for mtl in obj_path.parent.glob('*.mtl'):
+    logger.debug('unlink "{}"', mtl)
+    mtl.unlink()
 
   return converter.valid_surfaces()
 
@@ -523,6 +532,9 @@ def write_obj_from_dict(faces: dict,
     paths = []
 
     for name, fs in faces.items():
+      if not fs:
+        continue
+
       shape = fs[0] if len(fs) == 1 else compound(fs)
       path = td.joinpath(f'{name}.stl')
       write_stl_file(shape,
