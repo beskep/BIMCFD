@@ -547,7 +547,7 @@ class OpenFoamConverter:
 
     # wall and opening names
     wall_names = ['Surface_' + x for x in simplified['wall_names']]
-    opening_names = simplified['opening_names']
+    opening_names = simplified.get('opening_names', [])
     if self._opt.flag_external_zone:
       # 외부 영역 해석하는 경우 opening은 wall로 취급
       wall_names += opening_names

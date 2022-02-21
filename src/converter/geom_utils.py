@@ -476,7 +476,7 @@ def geometric_features(shape: TopoDS_Shape):
   for solid in exp.solids():
     for face in TopologyExplorer(solid).faces():
       fs[face.HashCode(100000000)].append(solid)
-  surface_count = len([x for x in fs.values() if len(x) == 1])
+  surface_count = sum(1 for x in fs.values() if len(x) == 1)
 
   features = OrderedDict([
       ('volume', volume),
@@ -519,6 +519,7 @@ def make_external_zone(shape: TopoDS_Shape,
   tuple
       TopoDS_Shape, {face_name: TopoDS_Face}
   """
+  # FIXME zone-shape 형상이 필요
   bbox = np.array(get_boundingbox(shape)).reshape([2, 3])
   height = np.abs(bbox[0, vertical_dim] - bbox[1, vertical_dim])
 
