@@ -9,7 +9,7 @@
 Uref                 2.0;
 Zref                 4;
 zDir                 (0 0 1);
-flowDir              (0 -1 0);
+flowDir              (1 0 0);
 z0                   uniform 0.0;
 zGround              uniform 0.0;
 value                $internalField;

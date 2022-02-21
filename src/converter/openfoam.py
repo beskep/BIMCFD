@@ -407,7 +407,7 @@ class OpenFoamCase(ButterflyCase):
 
     interior_key = '"(Interior).*"'
     if interior_key not in boundary_field:
-      boundary_field[interior_key] = OrderedDict([('type', 'empty')])
+      boundary_field[interior_key] = OrderedDict([('type', 'zeroGradient')])
 
     foam_file.values['boundaryField'] = boundary_field
 

@@ -380,14 +380,15 @@ class IfcConverter:
     flag_external_zone = (options['flag_external_zone'] and
                           options['external_zone_size'] > 1)
     if flag_external_zone:
-      shape = simplified['simplified'] or simplified['original']
+      shape = (simplified.get('space', None) or simplified['simplified'] or
+               simplified['original'])
 
-      _, zone_faces = geom_utils.make_external_zone(
-          shape, buffer_size=options['external_zone_size'])
-      write_obj_from_dict(faces=zone_faces,
-                          obj_path=os.path.join(working_dir, 'geometry',
-                                                'geometry_external.obj'),
-                          deflection=self.brep_deflection)
+      _, external_faces = geom_utils.make_external_zone(
+          shape, buffer=options['external_zone_size'])
+      write_obj_from_dict(
+          faces=external_faces,
+          obj_path=working_dir.joinpath('geometry/geometry_external.obj'),
+          deflection=self.brep_deflection)
 
     # geometry 폴더에 저장된 obj 파일을 OpenFOAM 케이스 폴더 가장 바깥에 복사
     if flag_external_zone:
@@ -431,6 +432,10 @@ class IfcConverter:
     save_dir.stat()
     working_dir = save_dir.joinpath(case_name)
     working_dir.mkdir(exist_ok=True)
+
+    if (options and options['flag_external_zone'] and
+        options['external_zone_size'] > 1):
+      simplified['wall_names'] = ['0']
 
     self._write_openfoam_object(options=options,
                                 simplified=simplified,

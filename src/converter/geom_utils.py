@@ -2,7 +2,7 @@ from collections import OrderedDict, defaultdict
 from collections.abc import Collection
 from itertools import chain
 from pathlib import Path
-from typing import List, Optional, Tuple, Union
+from typing import Any, Iterable, List, Optional, Tuple, Union
 
 import numpy as np
 from OCC.Core.Bnd import Bnd_Box
@@ -345,6 +345,19 @@ def planes_from_faces(faces: List[TopoDS_Shape]):
   return (plane_from_face(x) for x in faces)
 
 
+def face2plane(face: TopoDS_Face, extent=1000.0):
+  face_util = Face(face)
+  _, center = face_util.mid_point()
+  norm = face_normal(face)
+
+  return make_plane(center=center,
+                    vec_normal=gp_Vec(norm.XYZ()),
+                    extent_x_min=-extent,
+                    extent_x_max=extent,
+                    extent_y_min=-extent,
+                    extent_y_max=extent)
+
+
 def split_by_own_faces(shape: TopoDS_Shape, face_range=1000.0):
   # splitter = GEOMAlgo_Splitter()
   splitter = BOPAlgo_Splitter()
@@ -353,15 +366,7 @@ def split_by_own_faces(shape: TopoDS_Shape, face_range=1000.0):
   faces = TopologyExplorer(shape).faces()
 
   for face in faces:
-    face_util = Face(face)
-    _, center = face_util.mid_point()
-    norm = face_normal(face_util)
-    face_split = make_plane(center=center,
-                            vec_normal=gp_Vec(norm.XYZ()),
-                            extent_x_min=-face_range,
-                            extent_x_max=face_range,
-                            extent_y_min=-face_range,
-                            extent_y_max=face_range)
+    face_split = face2plane(face=face, extent=face_range)
     splitter.AddTool(face_split)
 
   splitter.Perform()
@@ -370,7 +375,7 @@ def split_by_own_faces(shape: TopoDS_Shape, face_range=1000.0):
 
 
 def split_by_faces(shape: TopoDS_Shape,
-                   faces: List[TopoDS_Face],
+                   faces: Iterable[TopoDS_Face],
                    parallel=False,
                    step=False,
                    verbose=False) -> TopoDS_Compound:
@@ -381,7 +386,7 @@ def split_by_faces(shape: TopoDS_Shape,
   ----------
   shape : TopoDS_Shape
       shape
-  faces : List[TopoDS_Face]
+  faces : Iterable[TopoDS_Face]
       faces
   parallel : bool, optional
       GEOMAlgo_Splitter의 SetParallelMode 여부
@@ -539,7 +544,7 @@ def _make_external_zone(shape: TopoDS_Shape, buffer_size=5, vertical_dim=2):
   zone_gp_pnts = [gp_Pnt(*xyz) for xyz in zone_pnts]
   zone = make_box(*zone_gp_pnts)
 
-  return zone
+  return zone, bbox
 
 
 def _classify_zone_face(zone: TopoDS_Shape, vertical_dim=2):
@@ -559,8 +564,42 @@ def _classify_zone_face(zone: TopoDS_Shape, vertical_dim=2):
   return face_dict
 
 
+def _external_zone_interior(zone: TopoDS_Shape,
+                            ground: TopoDS_Face,
+                            bbox: np.ndarray,
+                            buffer=0.2):
+  if buffer < 0.0:
+    raise ValueError('buffer < 1.0')
+
+  if buffer == 0.0:
+    points: Any = bbox
+  else:
+    min_pnts, max_pnts = np.min(bbox, axis=0), np.max(bbox, axis=0)
+    length = max_pnts - min_pnts
+    points = (min_pnts - length * buffer, max_pnts + length * buffer)
+
+  # bounding box보다 (1+buffer)배 큰 박스의 face 추출
+  box = make_box(gp_Pnt(*points[0]), gp_Pnt(*points[1]))
+  faces = (x for x in TopologyExplorer(box).faces()
+           if not _is_in(ground,
+                         GpropsFromShape(x).surface().CentreOfMass()))
+
+  # zone을 plane으로 나누고 interior 추출
+  split = split_by_faces(shape=zone, faces=(face2plane(x) for x in faces))
+  face_solid = defaultdict(list)
+  for solid in TopologyExplorer(split).solids():
+    for face in TopologyExplorer(solid).faces():
+      face_solid[face.HashCode(100000000)].append(solid)
+
+  interiors = (x for x in TopologyExplorer(split).faces()
+               if len(face_solid[x.HashCode(100000000)]) > 1)
+
+  return interiors
+
+
 def make_external_zone(shape: TopoDS_Shape,
-                       buffer_size=5,
+                       buffer=5,
+                       inner_buffer=0.2,
                        vertical_dim=2) -> Tuple[TopoDS_Shape, dict]:
   """주어진 shape을 둘러싸는 external zone 생성
 
@@ -568,8 +607,11 @@ def make_external_zone(shape: TopoDS_Shape,
   ----------
   shape
       대상 shape
-  buffer_size
+  buffer
       external zone의 여유 공간 크기. 대상 shape의 높이 (H)의 배수.
+  inner_buffer
+      mesh 설계를 위한 interior 경계면의 크기.
+      대상 shape의 bounding box의 (1.0 + inner_buff)배 크기인 내부 공간 생성.
   vertical_dim
       연직 방향 dimension (x: 0, y: 1, z: 2),
       ifcopenshell의 기본 설정은 z 방향 (2)
@@ -579,9 +621,9 @@ def make_external_zone(shape: TopoDS_Shape,
   tuple
       TopoDS_Shape, {face_name: TopoDS_Face}
   """
-  zone = _make_external_zone(shape=shape,
-                             buffer_size=buffer_size,
-                             vertical_dim=vertical_dim)
+  zone, bbox = _make_external_zone(shape=fuse_compound(shape),
+                                   buffer_size=buffer,
+                                   vertical_dim=vertical_dim)
   shape2 = fuzzy_cut(zone, shape, tol=1e-2)
   if not shape2:
     raise RuntimeError('BRepAlgoAPI_Cut (외부 영역 - 건물 형상) 오류')
@@ -601,6 +643,12 @@ def make_external_zone(shape: TopoDS_Shape,
   faces = defaultdict(list)
   for face in TopologyExplorer(shape2).faces():
     faces[_face_name(face)].append(face)
+
+  interiors = _external_zone_interior(zone=zone,
+                                      ground=zone_faces['Ground'],
+                                      bbox=bbox,
+                                      buffer=inner_buffer)
+  faces['Interior'] = list(interiors)
 
   return shape2, faces
 
