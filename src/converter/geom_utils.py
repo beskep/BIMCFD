@@ -8,13 +8,15 @@ import numpy as np
 from OCC.Core.Bnd import Bnd_Box
 from OCC.Core.BOPAlgo import BOPAlgo_MakerVolume, BOPAlgo_Splitter
 from OCC.Core.BRep import BRep_Tool, BRep_Tool_Surface
-from OCC.Core.BRepAlgoAPI import BRepAlgoAPI_Common, BRepAlgoAPI_Fuse
+from OCC.Core.BRepAlgoAPI import (BRepAlgoAPI_Common, BRepAlgoAPI_Cut,
+                                  BRepAlgoAPI_Fuse)
 from OCC.Core.BRepBndLib import brepbndlib_Add
 from OCC.Core.BRepBuilderAPI import (BRepBuilderAPI_MakeSolid,
                                      BRepBuilderAPI_Sewing,
                                      BRepBuilderAPI_Transform)
 from OCC.Core.BRepClass3d import BRepClass3d_SolidClassifier
 from OCC.Core.BRepExtrema import BRepExtrema_DistShapeShape
+from OCC.Core.BRepMesh import BRepMesh_IncrementalMesh
 from OCC.Core.BRepPrimAPI import BRepPrimAPI_MakeBox
 from OCC.Core.Geom import Geom_Plane
 from OCC.Core.gp import gp_Pnt, gp_Quaternion, gp_Trsf, gp_Vec
@@ -40,10 +42,19 @@ def make_box(*args):
   return box.Shape()
 
 
-def get_boundingbox(shape, tol=1e-4):
+def get_boundingbox(shape, tol=1e-8, use_mesh=True):
   bbox = Bnd_Box()
   bbox.SetGap(tol)
-  brepbndlib_Add(shape, bbox)
+
+  if use_mesh:
+    mesh = BRepMesh_IncrementalMesh()
+    mesh.SetParallelDefault(True)
+    mesh.SetShape(shape)
+    mesh.Perform()
+    if not mesh.IsDone():
+      raise AssertionError("Mesh not done.")
+
+  brepbndlib_Add(shape, bbox, use_mesh)
 
   return bbox.Get()
 
@@ -499,6 +510,55 @@ def shapes_distance(shape1: TopoDS_Shape, shape2: TopoDS_Shape,
   return dist.Value() if dist.IsDone() else None
 
 
+def fuzzy_cut(shape1, shape2, tol=5e-5, parallel=False):
+  cut = BRepAlgoAPI_Cut()
+  l1 = TopTools_ListOfShape()
+  l1.Append(shape1)
+  l2 = TopTools_ListOfShape()
+  l2.Append(shape2)
+
+  cut.SetArguments(l1)
+  cut.SetTools(l2)
+  cut.SetFuzzyValue(tol)
+  cut.SetRunParallel(parallel)
+  cut.Build()
+
+  return cut.Shape()
+
+
+def _make_external_zone(shape: TopoDS_Shape, buffer_size=5, vertical_dim=2):
+  bbox = np.array(get_boundingbox(shape)).reshape([2, 3])
+  height = np.abs(bbox[0, vertical_dim] - bbox[1, vertical_dim])
+
+  zone_pnts = [
+      np.min(bbox, axis=0) - buffer_size * height,
+      np.max(bbox, axis=0) + buffer_size * height
+  ]
+  zone_pnts[0][vertical_dim] = np.min(bbox[:, vertical_dim])  # 바닥
+
+  zone_gp_pnts = [gp_Pnt(*xyz) for xyz in zone_pnts]
+  zone = make_box(*zone_gp_pnts)
+
+  return zone
+
+
+def _classify_zone_face(zone: TopoDS_Shape, vertical_dim=2):
+  faces = list(TopologyExplorer(zone).faces())
+  gp_center = [GpropsFromShape(x).surface().CentreOfMass() for x in faces]
+  center = np.array([[p.X(), p.Y(), p.Z()] for p in gp_center])
+
+  arg_sort = np.argsort(center[:, vertical_dim])
+  ground = faces[arg_sort[0]]
+  ceiling = faces[arg_sort[-1]]
+  vertical = [faces[x] for x in arg_sort[1:-1]]
+
+  face_dict = {f'External_{i}': f for i, f in enumerate(vertical)}
+  face_dict['Ground'] = ground
+  face_dict['Ceiling'] = ceiling
+
+  return face_dict
+
+
 def make_external_zone(shape: TopoDS_Shape,
                        buffer_size=5,
                        vertical_dim=2) -> Tuple[TopoDS_Shape, dict]:
@@ -519,31 +579,30 @@ def make_external_zone(shape: TopoDS_Shape,
   tuple
       TopoDS_Shape, {face_name: TopoDS_Face}
   """
-  bbox = np.array(get_boundingbox(shape)).reshape([2, 3])
-  height = np.abs(bbox[0, vertical_dim] - bbox[1, vertical_dim])
+  zone = _make_external_zone(shape=shape,
+                             buffer_size=buffer_size,
+                             vertical_dim=vertical_dim)
+  shape2 = fuzzy_cut(zone, shape, tol=1e-2)
+  if not shape2:
+    raise RuntimeError('BRepAlgoAPI_Cut (외부 영역 - 건물 형상) 오류')
 
-  zone_pnts = [
-      np.min(bbox, axis=0) - buffer_size * height,
-      np.max(bbox, axis=0) + buffer_size * height
-  ]
-  zone_pnts[0][vertical_dim] = np.min(bbox[:, vertical_dim])  # 바닥
+  zone_faces = _classify_zone_face(zone=zone, vertical_dim=vertical_dim)
 
-  zone_gp_pnts = [gp_Pnt(*xyz) for xyz in zone_pnts]
-  zone = make_box(*zone_gp_pnts)
+  def _face_name(face):
+    center = GpropsFromShape(face).surface().CentreOfMass()
+    name = 'Surface_0'
+    for zn, zf in zone_faces.items():
+      if _is_in(zf, center, on=True):
+        name = zn
+        break
 
-  faces = list(TopologyExplorer(zone).faces())
-  gp_center = [GpropsFromShape(x).surface().CentreOfMass() for x in faces]
-  center = np.array([[p.X(), p.Y(), p.Z()] for p in gp_center])
+    return name
 
-  arg_sort = np.argsort(center[:, vertical_dim])
-  zone_dict = {
-      'External_' + str(i): f
-      for i, f in enumerate([faces[x] for x in arg_sort[1:-1]])
-  }
-  zone_dict['Ground'] = faces[arg_sort[0]]
-  zone_dict['Ceiling'] = faces[arg_sort[-1]]
+  faces = defaultdict(list)
+  for face in TopologyExplorer(shape2).faces():
+    faces[_face_name(face)].append(face)
 
-  return zone, zone_dict
+  return shape2, faces
 
 
 def compare_shapes(original: TopoDS_Shape, simplified: TopoDS_Shape):
