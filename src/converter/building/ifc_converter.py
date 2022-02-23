@@ -16,7 +16,6 @@ from OCC.Extend import DataExchange
 from converter import geom_utils
 from converter.ifc_utils import get_bounded_by, get_storey
 from converter.obj_convert import ObjConverter, write_obj, write_obj_from_dict
-from converter.openfoam_converter import OpenFoamConverter
 from converter.simplify import simplify_space
 
 from .converter import Converter

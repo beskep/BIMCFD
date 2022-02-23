@@ -78,6 +78,8 @@ class CfdSettingContent(DialogContent):
       'text_boundary_cell_size',
       'text_boundary_layers_count',
       'text_num_of_subdomains',
+      'text_vertical_dimension',
+      'text_inner_buffer',
   )
   _kv = '''
 <CfdSettingContent>
@@ -166,6 +168,17 @@ class CfdSettingContent(DialogContent):
         text: '5'
         unit: '배'
         id: text_external_size
+
+    SpacingBox:
+      TextFieldUnit:
+        hint_text: '수직 방향 차원'
+        text: '2'
+        id: text_vertical_dimension
+      TextFieldUnit:
+        hint_text: '버퍼 크기 (격자 설계 보조 공간)'
+        text: '0.2'
+        unit: '배'
+        id: text_inner_buffer
 
     SpacingBox:
       TextFieldUnit:

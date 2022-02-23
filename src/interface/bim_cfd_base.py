@@ -334,44 +334,51 @@ class BimCfdAppBase(MDApp):
     return options
 
   def get_openfoam_options(self):
-    simplfication_opt = self.get_simplification_options()
+    sopt = self.get_simplification_options()
+    copt = self.cfd_dialog.options
+    copt.update(self.external_dialog.options)
 
-    dialog_opt = self.cfd_dialog.options
-    dialog_opt.update(self.external_dialog.options)
     ofopt = {
         'solver': 'simpleFoam',
         'flag_external_zone':
             (self.root.ids.cfd_panel.ids.flag_external_zone.state == 'down'),
-        'flag_interior_faces': simplfication_opt['flag_internal_faces'],
-        'flag_opening_volume': simplfication_opt['flag_opening_volume'],
-        'flag_heat_flux': dialog_opt['flag_heat_flux'],
-        'flag_friction': dialog_opt['flag_friction'],
-        'external_temperature': dialog_opt['text_external_temperature'],
-        'heat_transfer_coefficient': dialog_opt['text_external_htc'],
-        'external_zone_size': dialog_opt['text_external_size'],
-        'z0': dialog_opt['text_wind_profile_roughness']
+        'flag_interior_faces': sopt['flag_internal_faces'],
+        'flag_opening_volume': sopt['flag_opening_volume'],
+        # 'flag_heat_flux': copt['flag_heat_flux'],
+        # 'flag_friction': copt['flag_friction'],
+        # 'external_temperature': copt['text_external_temperature'],
+        # 'heat_transfer_coefficient': copt['text_external_htc'],
+        # 'external_zone_size': copt['text_external_size'],
+        # 'z0': copt['text_wind_profile_roughness']
     }
 
-    if dialog_opt['flag_mesh_resolution']:
-      ofopt['grid_resolution'] = dialog_opt['text_mesh_resolution']
-    elif dialog_opt['flag_mesh_size']:
-      ofopt['max_cell_size'] = dialog_opt['text_mesh_size']
+    if copt['flag_mesh_resolution']:
+      ofopt['grid_resolution'] = copt['text_mesh_resolution']
+    elif copt['flag_mesh_size']:
+      ofopt['max_cell_size'] = copt['text_mesh_size']
     else:
       raise ValueError
 
     keys = {
-        'text_mesh_min_size': 'min_cell_size',
+        'flag_friction': 'flag_friction',
+        'flag_heat_flux': 'flag_heat_flux',
+        'flag_internal_faces': 'flag_internal_faces',
+        'flag_opening_volume': 'flag_opening_volume',
         'text_boundary_cell_size': 'boundary_cell_size',
+        'text_external_htc': 'heat_transfer_coefficient',
+        'text_external_size': 'external_zone_size',
+        'text_external_temperature': 'external_temperature',
+        'text_inner_buffer': 'inner_buffer',
+        'text_mesh_min_size': 'min_cell_size',
         'text_num_of_subdomains': 'num_of_subdomains',
+        'text_vertical_dimension': 'vertical_dimension',
+        'text_wind_profile_roughness': 'z0',
     }
     for dkey, okey in keys.items():
-      option = dialog_opt[dkey]
-      ofopt[okey] = option if option else None
+      ofopt[okey] = copt.get(dkey, None) or None
 
-    if dialog_opt['text_boundary_layers_count']:
-      ofopt['boundary_layers'] = {
-          'nLayers': dialog_opt['text_boundary_layers_count']
-      }
+    if copt['text_boundary_layers_count']:
+      ofopt['boundary_layers'] = {'nLayers': copt['text_boundary_layers_count']}
 
     return ofopt
 

@@ -7,7 +7,7 @@ from Extend.DataExchange import read_step_file, read_stl_file
 
 from converter.geom_utils import (align_obj_to_origin, fix_shape,
                                   make_external_zone)
-from converter.obj_convert import write_obj, write_obj_from_dict
+from converter.obj_convert import write_obj_from_dict
 
 from .converter import Converter
 
@@ -28,9 +28,8 @@ def _read_cad(path):
 
 class CADConverter(Converter):
 
-  def __init__(self, path, vertical_dim=2) -> None:
+  def __init__(self, path) -> None:
     self._shape = _read_cad(path=path)
-    self._vertical_dim = vertical_dim
     self._brep_deflection = (0.9, 0.5)
 
   def simplify_space(self, *args, **kwargs):
@@ -58,9 +57,11 @@ class CADConverter(Converter):
   def _write_openfoam_object(self, options: dict, simplified: dict,
                              working_dir: Path):
     shape = self._shape
-    _, external_faces = make_external_zone(shape=shape,
-                                           buffer=options['external_zone_size'],
-                                           vertical_dim=self._vertical_dim)
+    _, external_faces = make_external_zone(
+        shape=shape,
+        buffer=options['external_zone_size'],
+        inner_buffer=options.get('inner_buffer', 0.2),
+        vertical_dim=int(options.get('vertical_dimension', 2)))
 
     path = working_dir.joinpath('geometry.obj')
     write_obj_from_dict(faces=external_faces,

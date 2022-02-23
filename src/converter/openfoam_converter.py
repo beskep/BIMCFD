@@ -2,7 +2,7 @@ from collections import OrderedDict, namedtuple
 from dataclasses import dataclass, fields
 from itertools import chain
 from pathlib import Path
-from typing import Optional
+from typing import List, Optional
 
 from ifcopenshell import entity_instance as IfcEntity
 from loguru import logger
@@ -42,6 +42,16 @@ def _sort_foam_file_values(ff: FoamFile,
   return ff
 
 
+def _surface_name(names: Optional[List[str]], count: int):
+  if not names:
+    return [f'Surface_{x}' for x in range(count)]
+
+  if len(names) != count:
+    raise ValueError
+
+  return [x if x.startswith('Surface_') else f'Surface_{x}' for x in names]
+
+
 @dataclass
 class OpenFoamOption:
   solver: str = 'simpleFoam'
@@ -65,6 +75,10 @@ class OpenFoamOption:
   boundary_cell_size: Optional[float] = None
   boundary_layers: Optional[dict] = None
   num_of_subdomains: int = 1
+
+  # CAD
+  inner_buffer: float = 0.2
+  vertical_dimension: int = 2
 
   def __post_init__(self):
     if not OpenFoamCase.is_supported_solver(self.solver):
@@ -261,17 +275,7 @@ class OpenFoamConverter:
     OrderedDict
         T.boundaryField
     """
-
-    if surface_name is None:
-      surface_name = ['Surface_' + str(x) for x in range(len(surface))]
-    else:
-      if len(surface) != len(surface_name):
-        raise ValueError
-
-      surface_name = [
-          x if x.startswith('Surface_') else 'Surface_' + x
-          for x in surface_name
-      ]
+    surface_name = _surface_name(names=surface_name, count=len(surface))
 
     htc = self._opt.heat_transfer_coefficient
     try:
@@ -362,16 +366,7 @@ class OpenFoamConverter:
     OrderedDict
         T.boundaryField
     """
-    if surface_name is None:
-      surface_name = ['Surface_' + str(x) for x in range(len(surface))]
-    else:
-      if len(surface) != len(surface_name):
-        raise ValueError
-
-      surface_name = [
-          x if x.startswith('Surface_') else 'Surface_' + x
-          for x in surface_name
-      ]
+    surface_name = _surface_name(names=surface_name, count=len(surface))
 
     # 가장 첫번째 재료 이름, 조도 추정 추출함
     first_material = [
