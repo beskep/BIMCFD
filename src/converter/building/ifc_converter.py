@@ -62,8 +62,6 @@ class IfcConverter(Converter):
     self._ifc_types_slab = slab_types
     self._storeys = None
 
-    self._brep_deflection = (0.9, 0.5)
-
   @property
   def ifc(self) -> ifcopenshell.file:
     return self._ifc
@@ -71,19 +69,6 @@ class IfcConverter(Converter):
   @property
   def file_path(self):
     return self._file_path
-
-  @property
-  def brep_deflection(self):
-    return self._brep_deflection
-
-  @brep_deflection.setter
-  def brep_deflection(self, value):
-    if isinstance(value, (int, float)):
-      self._brep_deflection = (value, 0.5)
-    elif isinstance(value, Iterable):
-      self._brep_deflection = tuple(value)
-    else:
-      raise TypeError
 
   def create_geometry(self, entity: IfcEntity) -> TopoDS_Shape:
     return ifcopenshell.geom.create_shape(self.__geom_settings, entity).geometry

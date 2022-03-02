@@ -176,7 +176,7 @@ class CfdSettingContent(DialogContent):
         id: text_vertical_dimension
       TextFieldUnit:
         hint_text: '버퍼 크기 (격자 설계 보조 공간)'
-        text: '0.2'
+        text: '0.5'
         unit: '배'
         id: text_inner_buffer
 

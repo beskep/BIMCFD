@@ -124,6 +124,7 @@ class BimCfdApp(BimCfdAppBase):
       self.show_snackbar('CAD 로드 실패')
       logger.exception('CAD 로드 실패')
     else:
+      self.visualize_topology(spaces=[self._converter.shape])
       self.show_snackbar('CAD 로드 완료', duration=1.0)
 
   @mainthread
@@ -328,17 +329,19 @@ class BimCfdApp(BimCfdAppBase):
     assert self._converter is not None
     assert simplified is not None
 
-    openfoam_options = self.get_openfoam_options()
+    save_dir.joinpath('BIMCFD').mkdir()
     geom_dir = save_dir.joinpath('BIMCFD', 'geometry')
-    if not geom_dir.exists():
-      geom_dir.mkdir(parents=True)
+    if isinstance(self._converter, IfcConverter):
+      geom_dir.mkdir()
 
     self._converter.save_simplified_space(simplified=simplified,
                                           path=geom_dir.as_posix())
+
+    options = self.get_openfoam_options()
     self._converter.openfoam_case(simplified=simplified,
                                   save_dir=save_dir,
                                   case_name='BIMCFD',
-                                  options=openfoam_options)
+                                  options=options)
 
     self.show_snackbar('저장 완료')
 

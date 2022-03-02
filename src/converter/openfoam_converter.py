@@ -77,7 +77,7 @@ class OpenFoamOption:
   num_of_subdomains: int = 1
 
   # CAD
-  inner_buffer: float = 0.2
+  inner_buffer: float = 0.5
   vertical_dimension: int = 2
 
   def __post_init__(self):
@@ -89,11 +89,11 @@ class OpenFoamOption:
         raise ValueError('외부 영역 연산은 `simpleFoamExternal` 솔버만 지원합니다.')
 
       self.solver = 'simpleFoamExternal'
-      self.max_cell_size = 0.5
+      self.grid_resolution = 1
       logger.info(
           'flag_external_zone -> '
-          '{{solver: "{}", max_cell_size: {}}}', self.solver,
-          self.max_cell_size)
+          '{{solver: "{}", grid_resolution: {}}}', self.solver,
+          self.grid_resolution)
 
   @classmethod
   def from_dict(cls, d: dict):
@@ -466,7 +466,7 @@ class OpenFoamConverter:
       case.change_boundary_field(variable=ff.name, boundary_field=bf)
       _sort_foam_file_values(ff=ff)
 
-  def cf_mesh_dict(self, max_cell_size: float):
+  def cf_mesh_dict(self, max_cell_size: float, external=False):
     mesh_dict = BoundaryFieldDict(width=self._MW)
 
     mesh_dict.add_comment('Path to the surface mesh')
@@ -517,6 +517,13 @@ class OpenFoamConverter:
           }
       }
       mesh_dict['boundaryLayers'] = boundary_layers
+
+    if external:
+      mesh_dict['localRefinement'] = {
+          '"Surface.*"': {
+              'additionalRefinementLevels': '2'
+          }
+      }
 
     return mesh_dict
 
@@ -580,7 +587,8 @@ class OpenFoamConverter:
 
     # mesh
     max_cell_size = self._max_cell_size(simplified=simplified)
-    mesh_dict = self.cf_mesh_dict(max_cell_size=max_cell_size)
+    mesh_dict = self.cf_mesh_dict(max_cell_size=max_cell_size,
+                                  external=self._opt.flag_external_zone)
     case.change_foam_file_value('meshDict', mesh_dict)
 
     # case 저장

@@ -1,11 +1,26 @@
 from abc import ABC, abstractmethod
 from os import PathLike
 from pathlib import Path
+from typing import Iterable
 
 from converter.openfoam_converter import OpenFoamConverter
 
 
 class Converter(ABC):
+  _brep_deflection = (0.9, 0.5)
+
+  @property
+  def brep_deflection(self):
+    return self._brep_deflection
+
+  @brep_deflection.setter
+  def brep_deflection(self, value):
+    if isinstance(value, (int, float)):
+      self._brep_deflection = (value, 0.5)
+    elif isinstance(value, Iterable):
+      self._brep_deflection = tuple(value)
+    else:
+      raise TypeError
 
   @abstractmethod
   def simplify_space(self,
