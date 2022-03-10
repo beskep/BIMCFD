@@ -12,6 +12,7 @@ from OCC.Core.BRepAlgoAPI import (BRepAlgoAPI_Common, BRepAlgoAPI_Cut,
                                   BRepAlgoAPI_Fuse)
 from OCC.Core.BRepBndLib import brepbndlib_Add
 from OCC.Core.BRepBuilderAPI import (BRepBuilderAPI_MakeSolid,
+                                     BRepBuilderAPI_MakeVertex,
                                      BRepBuilderAPI_Sewing,
                                      BRepBuilderAPI_Transform)
 from OCC.Core.BRepClass3d import BRepClass3d_SolidClassifier
@@ -632,9 +633,16 @@ def make_external_zone(shape: TopoDS_Shape,
 
   def _face_name(face):
     center = GpropsFromShape(face).surface().CentreOfMass()
+    vertex = BRepBuilderAPI_MakeVertex(center).Vertex()
     name = 'Surface_0'
     for zn, zf in zone_faces.items():
-      if _is_in(zf, center, on=True):
+      # if _is_in(zf, center, tol=0.1, on=True):
+      #   name = zn
+      #   break
+
+      # XXX _is_in 오류 때문에 임의의 거리 기준으로 변경
+      dist = shapes_distance(zf, vertex, deflection=1e-2)
+      if dist <= 1.0:
         name = zn
         break
 
