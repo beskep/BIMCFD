@@ -601,7 +601,8 @@ def _external_zone_interior(zone: TopoDS_Shape,
 def make_external_zone(shape: TopoDS_Shape,
                        buffer=5,
                        inner_buffer=0.2,
-                       vertical_dim=2) -> Tuple[TopoDS_Shape, dict]:
+                       vertical_dim=2,
+                       each_wall=False) -> Tuple[TopoDS_Shape, dict]:
   """주어진 shape을 둘러싸는 external zone 생성
 
   Parameters
@@ -616,6 +617,8 @@ def make_external_zone(shape: TopoDS_Shape,
   vertical_dim
       연직 방향 dimension (x: 0, y: 1, z: 2),
       ifcopenshell의 기본 설정은 z 방향 (2)
+  each_wall
+      `True`이면 각 surface를 다른 이름으로 저장
 
   Returns
   -------
@@ -631,10 +634,10 @@ def make_external_zone(shape: TopoDS_Shape,
 
   zone_faces = _classify_zone_face(zone=zone, vertical_dim=vertical_dim)
 
-  def _face_name(face):
+  def _face_name(face, surface_index=0):
     center = GpropsFromShape(face).surface().CentreOfMass()
     vertex = BRepBuilderAPI_MakeVertex(center).Vertex()
-    name = 'Surface_0'
+    name = f'Surface_{surface_index:04d}'
     for zn, zf in zone_faces.items():
       # if _is_in(zf, center, tol=0.1, on=True):
       #   name = zn
@@ -649,8 +652,12 @@ def make_external_zone(shape: TopoDS_Shape,
     return name
 
   faces = defaultdict(list)
+  sidx = 0
   for face in TopologyExplorer(shape2).faces():
-    faces[_face_name(face)].append(face)
+    fn = _face_name(face, surface_index=sidx)
+    if each_wall and fn.startswith('Surface'):
+      sidx += 1
+    faces[fn].append(face)
 
   interiors = _external_zone_interior(zone=zone,
                                       ground=zone_faces['Ground'],

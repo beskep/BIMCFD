@@ -344,12 +344,6 @@ class BimCfdAppBase(MDApp):
             (self.root.ids.cfd_panel.ids.flag_external_zone.state == 'down'),
         'flag_interior_faces': sopt['flag_internal_faces'],
         'flag_opening_volume': sopt['flag_opening_volume'],
-        # 'flag_heat_flux': copt['flag_heat_flux'],
-        # 'flag_friction': copt['flag_friction'],
-        # 'external_temperature': copt['text_external_temperature'],
-        # 'heat_transfer_coefficient': copt['text_external_htc'],
-        # 'external_zone_size': copt['text_external_size'],
-        # 'z0': copt['text_wind_profile_roughness']
     }
 
     if copt['flag_mesh_resolution']:
@@ -364,6 +358,7 @@ class BimCfdAppBase(MDApp):
         'flag_heat_flux': 'flag_heat_flux',
         'flag_internal_faces': 'flag_internal_faces',
         'flag_opening_volume': 'flag_opening_volume',
+        'flag_each_wall': 'flag_each_wall',
         'text_boundary_cell_size': 'boundary_cell_size',
         'text_external_htc': 'heat_transfer_coefficient',
         'text_external_size': 'external_zone_size',

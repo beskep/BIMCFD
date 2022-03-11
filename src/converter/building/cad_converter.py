@@ -64,7 +64,8 @@ class CADConverter(Converter):
         shape=self.shape,
         buffer=options['external_zone_size'],
         inner_buffer=options.get('inner_buffer', 0.2),
-        vertical_dim=int(options.get('vertical_dimension', 2)))
+        vertical_dim=int(options.get('vertical_dimension', 2)),
+        each_wall=options.get('flag_each_wall', False))
 
     path = working_dir.joinpath('geometry.obj')
     write_obj_from_dict(faces=external_faces,

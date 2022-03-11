@@ -67,6 +67,7 @@ class CfdSettingContent(DialogContent):
   option_ids = (
       'flag_heat_flux',
       'flag_friction',
+      'flag_each_wall',
       'text_external_temperature',
       'text_external_htc',
       'flag_mesh_resolution',
@@ -96,7 +97,7 @@ class CfdSettingContent(DialogContent):
       MDBoxLayout:
         MDCheckbox:
           active: False
-          size_hint_x: None
+          size_hint_x: 0.25
           id: flag_heat_flux
         MDLabel:
           text: '열유속 해석'
@@ -104,10 +105,18 @@ class CfdSettingContent(DialogContent):
       MDBoxLayout:
         MDCheckbox:
           active: False
-          size_hint_x: None
+          size_hint_x: 0.25
           id: flag_friction
         MDLabel:
           text: '벽면 마찰 해석'
+
+      MDBoxLayout:
+        MDCheckbox:
+          active: False
+          size_hint_x: 0.25
+          id: flag_each_wall
+        MDLabel:
+          text: '개별 벽면 저장'
 
     SpacingBox:
       TextFieldUnit:

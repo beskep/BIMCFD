@@ -371,7 +371,9 @@ class IfcConverter(Converter):
                simplified['original'])
 
       _, external_faces = geom_utils.make_external_zone(
-          shape, buffer=options['external_zone_size'])
+          shape,
+          buffer=options['external_zone_size'],
+          each_wall=options.get('flag_each_wall', False))
       write_obj_from_dict(
           faces=external_faces,
           obj_path=working_dir.joinpath('geometry/geometry_external.obj'),
